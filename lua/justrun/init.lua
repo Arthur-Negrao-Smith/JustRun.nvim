@@ -119,7 +119,9 @@ M.run = function(task_name)
 		end,
 	})
 
-	vim.cmd("normal! G")
+	vim.opt_local.number = false
+	vim.opt_local.relativenumber = false
+	vim.cmd("startinsert") -- enter in insert mode in terminal
 end
 
 return M
