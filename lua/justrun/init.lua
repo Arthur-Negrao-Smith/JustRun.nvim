@@ -11,8 +11,9 @@ M.config = {
 	---@type string
 	default_task = "default",
 
-	--- If the selected task not found, then run
-	--- the first task in the table. Default: false
+	--- If the user don't provide args and the default task
+	--- not found, then run the first task in the table.
+	--- Default: false
 	---@type boolean
 	force_run = false,
 
