@@ -371,4 +371,11 @@ M.run_last = function()
 	M.run(state.last_task)
 end
 
+--- Helper function to enable typehint in user config
+---@param tasks table<string, JustTask | string>
+---@return table<string, JustTask | string>
+M.create_tasks = function(tasks)
+	return tasks
+end
+
 return M
