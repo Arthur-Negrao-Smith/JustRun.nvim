@@ -30,6 +30,11 @@ M.config = {
 	--- current task in tasks table. Default: false
 	---@type boolean
 	exit_on_success = false,
+
+	--- Default separator to concat all task commands.
+	--- Default: "&&"
+	---@type string
+	default_sep = "&&",
 }
 
 --- Default setup function
@@ -50,6 +55,17 @@ local state = {
 	---@type string?
 	last_task = nil,
 }
+
+---@return string
+local function get_sep()
+	return " " .. M.config.default_sep .. " "
+end
+
+---@param t table A table like a list to concat
+---@return string
+local function concat_with_sep(t)
+	return table.concat(t, get_sep())
+end
 
 --- Get a buffer to run the task
 ---@return integer|nil
@@ -96,7 +112,7 @@ local function handle_task(task_data, all_tasks)
 	end
 
 	if type(task_data) == "table" and vim.islist(task_data) then
-		return table.concat(task_data, " && ")
+		return concat_with_sep(task_data)
 	end
 
 	---@type string[]
@@ -126,7 +142,7 @@ local function handle_task(task_data, all_tasks)
 
 			-- if the function returns an array
 			elseif type(func_res) == "table" and vim.islist(func_res) then
-				table.insert(commands_to_join, table.concat(func_res, " && "))
+				table.insert(commands_to_join, concat_with_sep(func_res))
 
 			-- if the function returns a JustTask
 			else
@@ -135,7 +151,7 @@ local function handle_task(task_data, all_tasks)
 
 		-- if the task is an array
 		elseif type(task_data.cmd) == "table" and vim.islist(task_data.cmd) then
-			table.insert(commands_to_join, table.concat(task_data.cmd, " && "))
+			table.insert(commands_to_join, concat_with_sep(task_data.cmd))
 
 		-- if the task is a string or a JustTask
 		else
@@ -144,7 +160,7 @@ local function handle_task(task_data, all_tasks)
 	end
 
 	-- concat all strings to shell
-	return table.concat(commands_to_join, " && ")
+	return concat_with_sep(commands_to_join)
 end
 
 --- Load all tasks in file
@@ -354,7 +370,7 @@ M.ui = function()
 
 			-- if is a list
 			if type(task) == "table" and vim.islist(task) then
-				return item .. " (" .. table.concat(task, " && ") .. ")"
+				return item .. " (" .. concat_with_sep(task) .. ")"
 			end
 
 			if type(task) == "table" then
@@ -365,7 +381,7 @@ M.ui = function()
 
 				-- if is a list
 				if task.cmd and vim.islist(task.cmd) then
-					return item .. " (" .. table.concat(task.cmd, " && ") .. ")"
+					return item .. " (" .. concat_with_sep(task.cmd) .. ")"
 					-- if is a function
 				elseif task.cmd and type(task.cmd) == "function" then
 					return item .. " (" .. task.cmd() .. ")"
