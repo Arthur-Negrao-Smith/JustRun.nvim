@@ -44,14 +44,18 @@ M.load_tasks = function()
 	local task_file = workdir .. "/" .. M.config.filename
 
 	if vim.fn.filereadable(task_file) == 0 then
-		return {}, "File " .. task_file .. " not found in root workdir"
+		return {}, "File " .. M.config.filename .. " not found in root workdir: " .. workdir
 	end
 
 	---@type boolean, string[]
 	local status, result = pcall(dofile, task_file)
 
 	if not status then
-		return {}, "Error reading " .. M.config.filename .. " must return a Lua table"
+		return {}, "Syntax error in " .. M.config.filename .. ": " .. tostring(result)
+	end
+
+	if type(result) ~= "table" then
+		return {}, "The file " .. M.config.filename .. " must return a Lua table."
 	end
 
 	return result, nil
@@ -67,6 +71,11 @@ M.run = function(task_name)
 	-- if a error occurs to load the commands
 	if err then
 		vim.notify(err, vim.log.levels.ERROR)
+		return
+	end
+
+	if commands == {} then
+		vim.notify("Undefined error to load the tasks", vim.log.levels.ERROR)
 		return
 	end
 
