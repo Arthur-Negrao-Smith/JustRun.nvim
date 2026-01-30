@@ -84,15 +84,19 @@ end
 ---@field exit_on_success boolean?
 local JustTask = {}
 
----@alias JustTasksTable table<string, string | JustTask>[]
+---@alias JustTasksTable table<string, string | string[] | JustTask>[]
 
 --- Get the command of the current task
----@param task_data string | JustTask
+---@param task_data string | string[] | JustTask
 ---@param all_tasks JustTasksTable
 ---@return string
 local function handle_task(task_data, all_tasks)
 	if type(task_data) == "string" then
 		return task_data
+	end
+
+	if type(task_data) == "table" and vim.islist(task_data) then
+		return table.concat(task_data, " && ")
 	end
 
 	---@type string[]
@@ -348,6 +352,11 @@ M.ui = function()
 				return item .. " (" .. commands[item] .. ")"
 			end
 
+			-- if is a list
+			if type(task) == "table" and vim.islist(task) then
+				return item .. " (" .. table.concat(task, " && ") .. ")"
+			end
+
 			if type(task) == "table" then
 				-- if has a description
 				if task.desc then
@@ -393,8 +402,8 @@ M.run_last = function()
 end
 
 --- Helper function to enable typehint in user config
----@param tasks table<string, JustTask | string>
----@return table<string, JustTask | string>
+---@param tasks JustTasksTable
+---@return JustTasksTable
 M.create_tasks = function(tasks)
 	return tasks
 end
