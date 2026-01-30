@@ -33,6 +33,42 @@ M.setup = function(opts)
 	M.config = vim.tbl_deep_extend("force", M.config, opts or {})
 end
 
+local state = {
+	---@type integer?
+	buf = nil,
+
+	---@type integer?
+	win = nil,
+
+	--- last task runned
+	---@type string?
+	last_task = nil,
+}
+
+--- Get a buffer to run the task
+---@return integer|nil
+local function get_terminal_window()
+	if state.win and vim.api.nvim_win_is_valid(state.win) then
+		vim.api.nvim_set_current_win(state.win)
+	else
+		local split_cmd = M.config.split_direction == "vertical" and "vsplit" or "split"
+		vim.cmd(split_cmd)
+		state.win = vim.api.nvim_get_current_win()
+
+		local resize_cmd = M.config.split_direction == "vertical" and "vertical resize " or "resize "
+		vim.cmd(resize_cmd .. M.config.split_size)
+	end
+
+	-- delete the old buffer
+	if state.buf and vim.api.nvim_buf_is_valid(state.buf) then
+		vim.api.nvim_buf_delete(state.buf, { force = true })
+	end
+
+	state.buf = vim.api.nvim_create_buf(false, true)
+	vim.api.nvim_win_set_buf(state.win, state.buf)
+	return state.buf
+end
+
 --- Load all tasks in file
 ---@return string[] commands
 ---@return string? err
@@ -108,26 +144,16 @@ M.run = function(task_name)
 		end
 	end
 
-	---@type "vsplit" | "split"
-	local split_cmd = M.config.split_direction == "vertical" and "vsplit" or "split"
-	vim.cmd(split_cmd)
+	state.last_task = target_task
 
-	-- create a new buffer
-	local terminal_buffer = vim.api.nvim_create_buf(false, true)
-	vim.api.nvim_win_set_buf(0, terminal_buffer)
+	get_terminal_window()
 
-	if M.config.split_direction == "vertical" then
-		vim.cmd("vertical resize " .. M.config.split_size)
-	else
-		vim.cmd("resize " .. M.config.split_size)
-	end
-
-	vim.notify("Running task: " .. task_name, vim.log.levels.INFO)
+	vim.notify("Running task: " .. target_task, vim.log.levels.INFO)
 
 	vim.fn.jobstart(cmd_to_run, {
 		term = true,
-		on_exit = function(job_id, exit_code, event_type)
-			print("Task exited with code: " .. exit_code)
+		on_exit = function(_, exit_code, _)
+			print("Task '" .. target_task .. "' finished with code: " .. exit_code)
 		end,
 	})
 
