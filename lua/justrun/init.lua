@@ -11,6 +11,12 @@ M.config = {
 	---@type string
 	default_task = "default",
 
+	--- Current work directory to run the task. This option
+	--- could be overwrited by "cwd" in current task in tasks
+	--- table. Default: "."
+	---@type string
+	cwd = ".",
+
 	--- If the user don't provide args and the default task
 	--- not found, then run the first task in the table.
 	--- Default: false
@@ -98,6 +104,7 @@ end
 ---@field run_before string[]? Tasks to run before. (Only tasks name)
 ---@field desc string? Task description
 ---@field exit_on_success boolean?
+---@field cwd string? The task current work directory
 local JustTask = {}
 
 ---@alias JustTasksTable table<string, string | string[] | JustTask>[]
@@ -254,6 +261,7 @@ M.run = function(task_name)
 
 	vim.fn.jobstart(cmd_to_run, {
 		term = true,
+		cwd = task_to_run.cwd or M.config.cwd,
 		on_exit = function(_, exit_code, _)
 			print("Task '" .. target_task .. "' finished with code: " .. exit_code)
 
