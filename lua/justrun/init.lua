@@ -75,7 +75,7 @@ local function get_terminal_window()
 	return state.buf
 end
 
----@alias JustTaskFunc fun(): JustTask | string
+---@alias JustTaskFunc fun(): JustTask | string | string[]
 
 ---@class JustTask
 ---@field cmd string | string[] | JustTaskFunc | nil Commands to run
@@ -86,6 +86,7 @@ local JustTask = {}
 
 ---@alias JustTasksTable table<string, string | JustTask>[]
 
+--- Get the command of the current task
 ---@param task_data string | JustTask
 ---@param all_tasks JustTasksTable
 ---@return string
@@ -112,13 +113,33 @@ local function handle_task(task_data, all_tasks)
 
 	-- if the task has a command, then use recursion
 	if task_data.cmd then
+		-- if the task is a function
 		if type(task_data.cmd) == "function" then
-			table.insert(commands_to_join, handle_task(task_data.cmd(), all_tasks))
+			local func_res = task_data.cmd()
+			-- if function returns a string
+			if type(func_res) == "string" then
+				table.insert(commands_to_join, func_res)
+
+			-- if the function returns an array
+			elseif type(func_res) == "table" and vim.islist(func_res) then
+				table.insert(commands_to_join, table.concat(func_res, " && "))
+
+			-- if the function returns a JustTask
+			else
+				table.insert(commands_to_join, handle_task(task_data.cmd(), all_tasks))
+			end
+
+		-- if the task is an array
+		elseif type(task_data.cmd) == "table" and vim.islist(task_data.cmd) then
+			table.insert(commands_to_join, table.concat(task_data.cmd, " && "))
+
+		-- if the task is a string or a JustTask
 		else
 			table.insert(commands_to_join, handle_task(task_data.cmd, all_tasks))
 		end
 	end
 
+	-- concat all strings to shell
 	return table.concat(commands_to_join, " && ")
 end
 
