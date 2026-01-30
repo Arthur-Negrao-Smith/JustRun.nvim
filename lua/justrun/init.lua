@@ -113,6 +113,8 @@ M.run = function(task_name)
 		vim.cmd("resize " .. M.config.split_size)
 	end
 
+	vim.notify("Running task: " .. task_name, vim.log.levels.INFO)
+
 	vim.fn.jobstart(cmd_to_run, {
 		term = true,
 		on_exit = function(job_id, exit_code, event_type)
@@ -124,5 +126,73 @@ M.run = function(task_name)
 	vim.opt_local.relativenumber = false
 	vim.cmd("startinsert") -- enter in insert mode in terminal
 end
+
+--- Run the task under the cursor
+---@return nil
+M.run_under_cursor = function()
+	if vim.o.filetype ~= "lua" then
+		vim.notify("Just lua files can run tasks: " .. vim.o.filetype, vim.log.levels.ERROR)
+		return
+	end
+
+	local current_filename = string.gsub(vim.api.nvim_buf_get_name(0), vim.fn.getcwd() .. "/", "")
+	if current_filename ~= M.config.filename then
+		vim.notify(
+			"Just default tasks file '" .. M.config.filename .. "' can run tasks: " .. current_filename,
+			vim.log.levels.ERROR
+		)
+		return
+	end
+
+	local treesitter = vim.treesitter
+
+	local has_parser = pcall(treesitter.get_parser, 0, "lua")
+	if not has_parser then
+		vim.notify("TreeSitter Lua parser not found.", vim.log.levels.ERROR)
+		return
+	end
+
+	---@type TSNode? node under the cursor
+	local node = treesitter.get_node()
+
+	while node do
+		if node:type() == "field" then
+			break
+		end
+
+		node = node:parent()
+	end
+
+	if not node then
+		vim.notify("Cursor is not inside a task definition.", vim.log.levels.ERROR)
+		return
+	end
+
+	---@type TSNode[]
+	local key_nodes = node:field("name") -- name in lua is just a variable or string
+
+	if #key_nodes == 0 then
+		key_nodes = node:field("key") -- key in lua is a [""]
+	end
+
+	if #key_nodes == 0 then
+		vim.notify("Could not identify task name.", vim.log.levels.ERROR)
+		return
+	end
+
+	---@type TSNode
+	local task_key = key_nodes[1]
+
+	---@type string
+	local task_name = treesitter.get_node_text(task_key, 0)
+
+	-- clean the task name. Ex: ["key"] -> key
+	task_name = task_name:gsub("[%[%]\"']", "")
+
+	M.run(task_name)
+end
+
+-- TODO: Create a ui to select the task
+M.ui = function(opts) end
 
 return M

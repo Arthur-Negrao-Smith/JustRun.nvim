@@ -36,3 +36,7 @@ end, {
 		return matches
 	end,
 })
+
+vim.api.nvim_create_user_command("JustRunUnderCursor", justrun.run_under_cursor, {
+	nargs = 0,
+})
