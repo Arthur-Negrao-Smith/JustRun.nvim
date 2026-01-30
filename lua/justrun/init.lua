@@ -34,7 +34,7 @@ M.setup = function(opts)
 end
 
 --- Load all tasks in file
----@return string[]? commands
+---@return string[] commands
 ---@return string? err
 M.load_tasks = function()
 	---@type string
@@ -44,14 +44,14 @@ M.load_tasks = function()
 	local task_file = workdir .. "/" .. M.config.filename
 
 	if vim.fn.filereadable(task_file) == 0 then
-		return nil, "File " .. task_file .. " not found in root workdir"
+		return {}, "File " .. task_file .. " not found in root workdir"
 	end
 
 	---@type boolean, string[]
 	local status, result = pcall(dofile, task_file)
 
 	if not status then
-		return nil, "Error reading " .. M.config.filename .. " must return a Lua table"
+		return {}, "Error reading " .. M.config.filename .. " must return a Lua table"
 	end
 
 	return result, nil
@@ -61,7 +61,7 @@ end
 ---@param task_name string?
 ---@return nil
 M.run = function(task_name)
-	---@type string[]?, string?
+	---@type string[], string?
 	local commands, err = M.load_tasks()
 
 	-- if a error occurs to load the commands
@@ -192,7 +192,44 @@ M.run_under_cursor = function()
 	M.run(task_name)
 end
 
--- TODO: Create a ui to select the task
-M.ui = function(opts) end
+--- Run a ui with all tasks in a menu to select
+---@return nil
+M.ui = function()
+	---@type string[], string?
+	local commands, err = M.load_tasks()
+
+	if err then
+		vim.notify(err, vim.log.levels.ERROR)
+		return
+	end
+
+	local task_keys = vim.tbl_keys(commands)
+	table.sort(task_keys)
+	table.insert(task_keys, "Exit Menu")
+
+	---@type string
+	local exit_option = "Exit Menu"
+
+	vim.ui.select(task_keys, {
+		prompt = "Select a task to run:",
+		format_item = function(item)
+			if item == exit_option then
+				return exit_option
+			end
+
+			return item .. " (" .. commands[item] .. ")"
+		end,
+	}, function(choice)
+		if choice == exit_option then
+			vim.notify("Closed the tasks menu.", vim.log.levels.INFO)
+			return
+		end
+
+		if choice then
+			M.run(choice)
+			return
+		end
+	end)
+end
 
 return M

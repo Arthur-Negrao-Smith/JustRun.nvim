@@ -40,3 +40,7 @@ end, {
 vim.api.nvim_create_user_command("JustRunUnderCursor", justrun.run_under_cursor, {
 	nargs = 0,
 })
+
+vim.api.nvim_create_user_command("JustRunUi", justrun.ui, {
+	nargs = 0,
+})
