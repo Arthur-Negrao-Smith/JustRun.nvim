@@ -267,4 +267,15 @@ M.ui = function()
 	end)
 end
 
+--- Run the last runned task
+---@type nil
+M.run_last = function()
+	if not state.last_task then
+		vim.notify("No tasks have been run yet!", vim.log.levels.WARN)
+		return
+	end
+
+	M.run(state.last_task)
+end
+
 return M

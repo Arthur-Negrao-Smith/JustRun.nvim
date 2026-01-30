@@ -16,7 +16,7 @@ vim.api.nvim_create_user_command("JustRun", function(opts)
 	justrun.run(args)
 end, {
 	nargs = "?", -- just 1 or 0 arguments
-	complete = function(ArgLead, CmdLine, CursorPos)
+	complete = function(ArgLead, _, _)
 		local tasks, _ = justrun.load_tasks()
 
 		if not tasks then
@@ -42,5 +42,9 @@ vim.api.nvim_create_user_command("JustRunUnderCursor", justrun.run_under_cursor,
 })
 
 vim.api.nvim_create_user_command("JustRunUi", justrun.ui, {
+	nargs = 0,
+})
+
+vim.api.nvim_create_user_command("JustRunLast", justrun.run_last, {
 	nargs = 0,
 })
