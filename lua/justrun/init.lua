@@ -24,6 +24,12 @@ M.config = {
 	--- Terminal size. Default: 50
 	---@type integer
 	split_size = 50,
+
+	--- Close the terminal if the task was a success. This
+	--- option could be overwrited by 'exit_on_success' in
+	--- current task in tasks table. Default: false
+	---@type boolean
+	exit_on_success = false,
 }
 
 --- Default setup function
@@ -69,8 +75,55 @@ local function get_terminal_window()
 	return state.buf
 end
 
+---@alias JustTaskFunc fun(): JustTask | string
+
+---@class JustTask
+---@field cmd string | string[] | JustTaskFunc | nil Commands to run
+---@field run_before string[]? Tasks to run before. (Only tasks name)
+---@field desc string? Task description
+---@field exit_on_success boolean?
+local JustTask = {}
+
+---@alias JustTasksTable table<string, string | JustTask>[]
+
+---@param task_data string | JustTask
+---@param all_tasks JustTasksTable
+---@return string
+local function handle_task(task_data, all_tasks)
+	if type(task_data) == "string" then
+		return task_data
+	end
+
+	---@type string[]
+	local commands_to_join = {}
+
+	-- if task has others tasks to run
+	if task_data.run_before then
+		for _, item in ipairs(task_data.run_before) do
+			-- if the item is a task, then use recursion
+			if all_tasks[item] then
+				table.insert(commands_to_join, handle_task(all_tasks[item], all_tasks))
+			else
+				-- if is not a task name, then is a command
+				table.insert(commands_to_join, item)
+			end
+		end
+	end
+
+	-- if the task has a command, then use recursion
+	if task_data.cmd then
+		if type(task_data.cmd) == "function" then
+			table.insert(commands_to_join, handle_task(task_data.cmd(), all_tasks))
+		else
+			table.insert(commands_to_join, handle_task(task_data.cmd, all_tasks))
+		end
+	end
+
+	return table.concat(commands_to_join, " && ")
+end
+
 --- Load all tasks in file
----@return string[] commands
+---@return JustTasksTable commands
 ---@return string? err
 M.load_tasks = function()
 	---@type string
@@ -101,8 +154,8 @@ end
 ---@param task_name string?
 ---@return nil
 M.run = function(task_name)
-	---@type string[], string?
-	local commands, err = M.load_tasks()
+	---@type JustTasksTable, string?
+	local tasks_table, err = M.load_tasks()
 
 	-- if a error occurs to load the commands
 	if err then
@@ -110,7 +163,7 @@ M.run = function(task_name)
 		return
 	end
 
-	if commands == {} then
+	if vim.tbl_isempty(tasks_table) then
 		vim.notify("Undefined error to load the tasks", vim.log.levels.ERROR)
 		return
 	end
@@ -121,18 +174,18 @@ M.run = function(task_name)
 	---@type boolean
 	local user_provide_args = (task_name ~= nil and task_name ~= "")
 
-	---@type string?
-	local cmd_to_run = commands[target_task]
+	---@type string | JustTask | nil
+	local task_to_run = tasks_table[target_task]
 
 	-- if the task is null
-	if not cmd_to_run then
+	if not task_to_run then
 		-- if the user don't provide arguments and force run task
 		if not user_provide_args and M.config.force_run then
-			local first_key, first_val = next(commands)
+			local first_key, first_val = next(tasks_table)
 
 			-- if the first value is not nil
 			if first_val then
-				cmd_to_run = first_val
+				task_to_run = first_val
 				vim.notify("No tasks were provided. Runnig: " .. first_key, vim.log.levels.INFO)
 			else
 				vim.notify("No tasks found in file.", vim.log.levels.ERROR)
@@ -146,14 +199,27 @@ M.run = function(task_name)
 
 	state.last_task = target_task
 
+	local cmd_to_run = handle_task(task_to_run, tasks_table)
+
 	get_terminal_window()
 
 	vim.notify("Running task: " .. target_task, vim.log.levels.INFO)
+
+	---@type boolean
+	local should_exit = M.config.exit_on_success
+	if type(task_to_run) == "table" and task_to_run.exit_on_success ~= nil then
+		should_exit = task_to_run.exit_on_success
+	end
 
 	vim.fn.jobstart(cmd_to_run, {
 		term = true,
 		on_exit = function(_, exit_code, _)
 			print("Task '" .. target_task .. "' finished with code: " .. exit_code)
+
+			if should_exit then
+				vim.api.nvim_win_close(state.win, true)
+				return
+			end
 		end,
 	})
 
@@ -247,12 +313,39 @@ M.ui = function()
 
 	vim.ui.select(task_keys, {
 		prompt = "Select a task to run:",
+		---@param item string
+		---@return string
 		format_item = function(item)
 			if item == exit_option then
 				return exit_option
 			end
 
-			return item .. " (" .. commands[item] .. ")"
+			---@type string | JustTask | JustTaskFunc
+			local task = commands[item]
+
+			if type(task) == "string" then
+				return item .. " (" .. commands[item] .. ")"
+			end
+
+			if type(task) == "table" then
+				-- if has a description
+				if task.desc then
+					return item .. " (" .. task.desc .. ")"
+				end
+
+				-- if is a list
+				if task.cmd and vim.islist(task.cmd) then
+					return item .. " (" .. table.concat(task.cmd, " && ") .. ")"
+					-- if is a function
+				elseif task.cmd and type(task.cmd) == "function" then
+					return item .. " (" .. task.cmd() .. ")"
+					-- if is a string
+				elseif task.cmd and type(task.cmd) == "string" then
+					return item .. " (" .. task.cmd .. ")"
+				end
+			end
+
+			return item
 		end,
 	}, function(choice)
 		if choice == exit_option then
@@ -268,7 +361,7 @@ M.ui = function()
 end
 
 --- Run the last runned task
----@type nil
+---@return nil
 M.run_last = function()
 	if not state.last_task then
 		vim.notify("No tasks have been run yet!", vim.log.levels.WARN)
