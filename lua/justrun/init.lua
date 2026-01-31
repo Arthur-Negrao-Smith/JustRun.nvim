@@ -7,13 +7,15 @@ M.config = {
 	filename = ".justrun.lua",
 
 	--- Name to search the default task when use :JustRun
-	--- without args. Default: "default"
+	--- without args.
+	--- Default: "default"
 	---@type string
 	default_task = "default",
 
-	--- Current work directory to run the task. This option
+	--- Current working directory to run the task. This option
 	--- could be overwrited by "cwd" in current task in tasks
-	--- table. Default: "."
+	--- table.
+	--- Default: "."
 	---@type string
 	cwd = ".",
 
@@ -23,17 +25,20 @@ M.config = {
 	---@type boolean
 	force_run = false,
 
-	--- Opened terminal orientation. Default: "vertical"
+	--- Opened terminal orientation.
+	--- Default: "vertical"
 	---@type "vertical" | "horizontal"
 	split_direction = "vertical",
 
-	--- Terminal size. Default: 50
+	--- Terminal size.
+	--- Default: 50
 	---@type integer
 	split_size = 50,
 
 	--- Close the terminal if the task was a success. This
 	--- option could be overwrited by 'exit_on_success' in
-	--- current task in tasks table. Default: false
+	--- current task in tasks table.
+	--- Default: false
 	---@type boolean
 	exit_on_success = false,
 
@@ -41,6 +46,13 @@ M.config = {
 	--- Default: "&&"
 	---@type string
 	default_sep = "&&",
+
+	--- Maximum recursion depth for nested tasks to prevent
+	--- infinite loops. Set to -1 to disable the limit (use
+	--- with caution).
+	--- Default: 20
+	---@type integer
+	max_depth = 20,
 }
 
 --- Default setup function
@@ -79,10 +91,12 @@ local function get_terminal_window()
 	if state.win and vim.api.nvim_win_is_valid(state.win) then
 		vim.api.nvim_set_current_win(state.win)
 	else
+		---@type "vsplit" | "split"
 		local split_cmd = M.config.split_direction == "vertical" and "vsplit" or "split"
 		vim.cmd(split_cmd)
 		state.win = vim.api.nvim_get_current_win()
 
+		---@type "vertical resize " | "resize "
 		local resize_cmd = M.config.split_direction == "vertical" and "vertical resize " or "resize "
 		vim.cmd(resize_cmd .. M.config.split_size)
 	end
@@ -104,22 +118,31 @@ end
 ---@field run_before string[]? Tasks to run before. (Only tasks name)
 ---@field desc string? Task description
 ---@field exit_on_success boolean?
----@field cwd string? The task current work directory
+---@field cwd string? The task current working directory
 local JustTask = {}
 
 ---@alias JustTasksTable table<string, string | string[] | JustTask>[]
 
 --- Get the command of the current task
----@param task_data string | string[] | JustTask
----@param all_tasks JustTasksTable
----@return string
-local function handle_task(task_data, all_tasks)
+---@param task_data string | string[] | JustTask Current task to handle
+---@param all_tasks JustTasksTable Table with all tasks
+---@param depth integer Current depth counter
+---@return string command
+---@return string? err
+local function handle_task(task_data, all_tasks, depth)
+	-- if the max depth
+	if depth ~= -1 and depth > M.config.max_depth then
+		---@type string
+		local err = "Max nesting limit reached (" .. M.config.max_depth .. "). Possible circular dependency."
+		return "", err
+	end
+
 	if type(task_data) == "string" then
-		return task_data
+		return task_data, nil
 	end
 
 	if type(task_data) == "table" and vim.islist(task_data) then
-		return concat_with_sep(task_data)
+		return concat_with_sep(task_data), nil
 	end
 
 	---@type string[]
@@ -130,9 +153,17 @@ local function handle_task(task_data, all_tasks)
 		for _, item in ipairs(task_data.run_before) do
 			-- if the item is a task, then use recursion
 			if all_tasks[item] then
-				table.insert(commands_to_join, handle_task(all_tasks[item], all_tasks))
-			else
+				local sub_cmd, err = handle_task(all_tasks[item], all_tasks, depth + 1)
+
+				-- if a error occurs
+				if err then
+					return "", err
+				end
+
+				table.insert(commands_to_join, sub_cmd)
+
 				-- if is not a task name, then is a command
+			else
 				table.insert(commands_to_join, item)
 			end
 		end
@@ -153,7 +184,13 @@ local function handle_task(task_data, all_tasks)
 
 			-- if the function returns a JustTask
 			else
-				table.insert(commands_to_join, handle_task(task_data.cmd(), all_tasks))
+				local sub_cmd, err = handle_task(task_data.cmd(), all_tasks, depth + 1)
+
+				if err then
+					return "", err
+				end
+
+				table.insert(commands_to_join, sub_cmd)
 			end
 
 		-- if the task is an array
@@ -162,7 +199,13 @@ local function handle_task(task_data, all_tasks)
 
 		-- if the task is a string or a JustTask
 		else
-			table.insert(commands_to_join, handle_task(task_data.cmd, all_tasks))
+			local sub_cmd, err = handle_task(task_data.cmd, all_tasks, depth + 1)
+
+			if err then
+				return "", err
+			end
+
+			table.insert(commands_to_join, sub_cmd)
 		end
 	end
 
@@ -247,7 +290,13 @@ M.run = function(task_name)
 
 	state.last_task = target_task
 
-	local cmd_to_run = handle_task(task_to_run, tasks_table)
+	---@type string, string?
+	local cmd_to_run, err = handle_task(task_to_run, tasks_table, 1)
+
+	if err then
+		vim.notify(err, vim.log.levels.ERROR)
+		return
+	end
 
 	get_terminal_window()
 
@@ -390,9 +439,25 @@ M.ui = function()
 				-- if is a list
 				if task.cmd and vim.islist(task.cmd) then
 					return item .. " (" .. concat_with_sep(task.cmd) .. ")"
+
 					-- if is a function
 				elseif task.cmd and type(task.cmd) == "function" then
-					return item .. " (" .. task.cmd() .. ")"
+					---@type string | string[] | JustTask
+					local func_return = task.cmd()
+
+					-- if the function returns a string
+					if type(func_return) == "string" then
+						return item .. " (" .. func_return .. ")"
+
+					-- if the function returns a string list
+					elseif type(func_return) == "table" and vim.islist(func_return) then
+						return item .. " (" .. concat_with_sep(func_return) .. ")"
+
+					-- if the function returns a JustTask
+					else
+						return item .. " (Nested tasks)"
+					end
+
 					-- if is a string
 				elseif task.cmd and type(task.cmd) == "string" then
 					return item .. " (" .. task.cmd .. ")"
