@@ -1,48 +1,45 @@
 local M = {}
 
 M.config = {
-	--- Default file to load the execute commands.
+	--- Default file to load task definitions.
 	--- Default: ".justrun.lua"
 	---@type string
 	filename = ".justrun.lua",
 
-	--- Name to search the default task when use :JustRun
-	--- without args.
+	--- Task to run when use :JustRun is used without arguments
 	--- Default: "default"
 	---@type string
 	default_task = "default",
 
-	--- Current working directory to run the task. This option
-	--- could be overwrited by "cwd" in current task in tasks
-	--- table.
+	--- Default working directory. This option can be overridden
+	--- by the "cwd" field in the task definition.
 	--- Default: "."
 	---@type string
 	cwd = ".",
 
-	--- If the user don't provide args and the default task
-	--- not found, then run the first task in the table.
+	--- If arguments are missing and the default task is not found,
+	--- run the first available task in the table.
 	--- Default: false
 	---@type boolean
 	force_run = false,
 
-	--- Opened terminal orientation.
+	--- Orientation of the terminal split.
 	--- Default: "vertical"
 	---@type "vertical" | "horizontal"
 	split_direction = "vertical",
 
-	--- Terminal size.
+	--- Size of the terminal split.
 	--- Default: 50
 	---@type integer
 	split_size = 50,
 
-	--- Close the terminal if the task was a success. This
-	--- option could be overwrited by 'exit_on_success' in
-	--- current task in tasks table.
+	--- Close the terminal if the task succeeds. This option can be
+	--- overridden by 'exit_on_success' in the task definition.
 	--- Default: false
 	---@type boolean
 	exit_on_success = false,
 
-	--- Default separator to concat all task commands.
+	--- Default separator used to join task commands.
 	--- Default: "&&"
 	---@type string
 	default_sep = "&&",
@@ -79,13 +76,13 @@ local function get_sep()
 	return " " .. M.config.default_sep .. " "
 end
 
----@param t table A table like a list to concat
+---@param t table A table/list of strings to join
 ---@return string
 local function concat_with_sep(t)
 	return table.concat(t, get_sep())
 end
 
---- Get a buffer to run the task
+--- Get a buffer to run the task, recycling a window if possible
 ---@return integer|nil
 local function get_terminal_window()
 	if state.win and vim.api.nvim_win_is_valid(state.win) then
@@ -101,7 +98,7 @@ local function get_terminal_window()
 		vim.cmd(resize_cmd .. M.config.split_size)
 	end
 
-	-- delete the old buffer
+	-- delete the older buffer
 	if state.buf and vim.api.nvim_buf_is_valid(state.buf) then
 		vim.api.nvim_buf_delete(state.buf, { force = true })
 	end
@@ -115,22 +112,22 @@ end
 
 ---@class JustTask
 ---@field cmd string | string[] | JustTaskFunc | nil Commands to run
----@field run_before string[]? Tasks to run before. (Only tasks name)
+---@field run_before string[]? Tasks to run before this one. (Only tasks name)
 ---@field desc string? Task description
----@field exit_on_success boolean?
----@field cwd string? The task current working directory
+---@field exit_on_success boolean? Close window on success
+---@field cwd string? The task's current working directory
 local JustTask = {}
 
 ---@alias JustTasksTable table<string, string | string[] | JustTask>[]
 
---- Get the command of the current task
+--- Recursively resolve the command string for a task
 ---@param task_data string | string[] | JustTask Current task to handle
----@param all_tasks JustTasksTable Table with all tasks
----@param depth integer Current depth counter
+---@param all_tasks JustTasksTable Table containing all tasks
+---@param depth integer Current recursion depth
 ---@return string command
 ---@return string? err
 local function handle_task(task_data, all_tasks, depth)
-	-- if the max depth
+	-- check for max recursion depth
 	if depth ~= -1 and depth > M.config.max_depth then
 		---@type string
 		local err = "Max nesting limit reached (" .. M.config.max_depth .. "). Possible circular dependency."
@@ -148,41 +145,40 @@ local function handle_task(task_data, all_tasks, depth)
 	---@type string[]
 	local commands_to_join = {}
 
-	-- if task has others tasks to run
+	-- handle dependencies (run_before)
 	if task_data.run_before then
 		for _, item in ipairs(task_data.run_before) do
-			-- if the item is a task, then use recursion
+			-- if the item is a known task, recurse
 			if all_tasks[item] then
 				local sub_cmd, err = handle_task(all_tasks[item], all_tasks, depth + 1)
 
-				-- if a error occurs
 				if err then
 					return "", err
 				end
 
 				table.insert(commands_to_join, sub_cmd)
 
-				-- if is not a task name, then is a command
+				-- if is not a task name, treat as a raw command
 			else
 				table.insert(commands_to_join, item)
 			end
 		end
 	end
 
-	-- if the task has a command, then use recursion
+	-- handle the main command
 	if task_data.cmd then
-		-- if the task is a function
+		-- if cmd is a function (dynamic command)
 		if type(task_data.cmd) == "function" then
 			local func_res = task_data.cmd()
-			-- if function returns a string
+
 			if type(func_res) == "string" then
 				table.insert(commands_to_join, func_res)
 
-			-- if the function returns an array
+				-- if cmd is table/list of strings
 			elseif type(func_res) == "table" and vim.islist(func_res) then
 				table.insert(commands_to_join, concat_with_sep(func_res))
 
-			-- if the function returns a JustTask
+			-- function returned a JustTask object
 			else
 				local sub_cmd, err = handle_task(task_data.cmd(), all_tasks, depth + 1)
 
@@ -193,11 +189,11 @@ local function handle_task(task_data, all_tasks, depth)
 				table.insert(commands_to_join, sub_cmd)
 			end
 
-		-- if the task is an array
+		-- if cmd is a list of strings
 		elseif type(task_data.cmd) == "table" and vim.islist(task_data.cmd) then
 			table.insert(commands_to_join, concat_with_sep(task_data.cmd))
 
-		-- if the task is a string or a JustTask
+		-- if the task is a string or a nested JustTask
 		else
 			local sub_cmd, err = handle_task(task_data.cmd, all_tasks, depth + 1)
 
@@ -209,11 +205,11 @@ local function handle_task(task_data, all_tasks, depth)
 		end
 	end
 
-	-- concat all strings to shell
+	-- join all strings to shell
 	return concat_with_sep(commands_to_join)
 end
 
---- Load all tasks in file
+--- Load all tasks from the configuration file
 ---@return JustTasksTable commands
 ---@return string? err
 M.load_tasks = function()
@@ -241,14 +237,13 @@ M.load_tasks = function()
 	return result, nil
 end
 
---- Run a task from a lua file
+--- Run a  specific task or the default one
 ---@param task_name string?
 ---@return nil
 M.run = function(task_name)
 	---@type JustTasksTable, string?
 	local tasks_table, err = M.load_tasks()
 
-	-- if a error occurs to load the commands
 	if err then
 		vim.notify(err, vim.log.levels.ERROR)
 		return
@@ -268,13 +263,12 @@ M.run = function(task_name)
 	---@type string | JustTask | nil
 	local task_to_run = tasks_table[target_task]
 
-	-- if the task is null
+	-- handle missing task
 	if not task_to_run then
-		-- if the user don't provide arguments and force run task
+		-- if the user doesn't provide args and force_run is enable, run the first task available
 		if not user_provide_args and M.config.force_run then
 			local first_key, first_val = next(tasks_table)
 
-			-- if the first value is not nil
 			if first_val then
 				task_to_run = first_val
 				vim.notify("No tasks were provided. Runnig: " .. first_key, vim.log.levels.INFO)
@@ -323,10 +317,10 @@ M.run = function(task_name)
 
 	vim.opt_local.number = false
 	vim.opt_local.relativenumber = false
-	vim.cmd("startinsert") -- enter in insert mode in terminal
+	vim.cmd("startinsert") -- enter insert mode in terminal
 end
 
---- Run the task under the cursor
+--- Run the task defined under the cursor in the config file
 ---@return nil
 M.run_under_cursor = function()
 	if vim.o.filetype ~= "lua" then
@@ -351,7 +345,7 @@ M.run_under_cursor = function()
 		return
 	end
 
-	---@type TSNode? node under the cursor
+	---@type TSNode?
 	local node = treesitter.get_node()
 
 	while node do
@@ -391,7 +385,7 @@ M.run_under_cursor = function()
 	M.run(task_name)
 end
 
---- Run a ui with all tasks in a menu to select
+--- Open a UI menu to select a task
 ---@return nil
 M.ui = function()
 	---@type string[], string?
@@ -436,11 +430,11 @@ M.ui = function()
 					return item .. " (" .. task.desc .. ")"
 				end
 
-				-- if is a list
+				-- if the cmd is a list
 				if task.cmd and vim.islist(task.cmd) then
 					return item .. " (" .. concat_with_sep(task.cmd) .. ")"
 
-					-- if is a function
+					-- if the cmd is a function
 				elseif task.cmd and type(task.cmd) == "function" then
 					---@type string | string[] | JustTask
 					local func_return = task.cmd()
@@ -458,7 +452,7 @@ M.ui = function()
 						return item .. " (Nested tasks)"
 					end
 
-					-- if is a string
+					-- if the cmd is a string
 				elseif task.cmd and type(task.cmd) == "string" then
 					return item .. " (" .. task.cmd .. ")"
 				end
@@ -479,7 +473,7 @@ M.ui = function()
 	end)
 end
 
---- Run the last runned task
+--- Re-run the last executed task
 ---@return nil
 M.run_last = function()
 	if not state.last_task then
@@ -490,7 +484,7 @@ M.run_last = function()
 	M.run(state.last_task)
 end
 
---- Helper function to enable typehint in user config
+--- Helper function to enable type hinting in user config
 ---@param tasks JustTasksTable
 ---@return JustTasksTable
 M.create_tasks = function(tasks)
