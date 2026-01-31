@@ -82,6 +82,21 @@ local function concat_with_sep(t)
 	return table.concat(t, get_sep())
 end
 
+---@type boolean
+local is_windows = vim.fn.has("win32") == 1 or vim.fn.has("win64") == 1
+
+--- ANSI colors to unix terminal
+---@type table<string, string>
+local ANSI_COLOR = {
+	RED = [=[\e[31m]=],
+	GREEN = [=[\e[32m]=],
+	BLUE = [=[\e[34m]=],
+	MAGENTA = [=[\e[35m]=],
+	RESET = [=[\e[0m]=],
+	BOLD = [=[\e[1m]=],
+	DARK_GREY = [=[\e[90m]=],
+}
+
 --- Get a buffer to run the task, recycling a window if possible
 ---@return integer|nil
 local function get_terminal_window()
@@ -302,7 +317,62 @@ M.run = function(task_name)
 		should_exit = task_to_run.exit_on_success
 	end
 
-	vim.fn.jobstart(cmd_to_run, {
+	-- command style --
+
+	---@type string
+	local prompt_display = is_windows and ("$ " .. cmd_to_run) or cmd_to_run
+
+	---@type integer
+	local width = #prompt_display
+
+	---@type integer
+	local win_width = vim.api.nvim_win_get_width(state.win)
+
+	-- get the min needed width
+	if width > win_width then
+		width = win_width
+	end
+
+	---@type string
+	local separator_line = string.rep("-", width)
+
+	---@type string
+	local styled_cmd = ""
+
+	if is_windows then
+		styled_cmd = "echo "
+			.. vim.fn.shellescape(prompt_display)
+			.. get_sep()
+			.. "echo "
+			.. vim.fn.shellescape(separator_line)
+			.. get_sep()
+			.. cmd_to_run
+
+		-- add colors in unix based systems
+	else
+		---@type string
+		local fmt_prompt = string.format(
+			"printf '%s$ %s%s%%s%s\\n' ", -- %%s to printf use
+			ANSI_COLOR.MAGENTA,
+			ANSI_COLOR.RESET,
+			ANSI_COLOR.BOLD,
+			ANSI_COLOR.RESET
+		)
+
+		---@type string
+		local fmt_line = string.format("printf '%s%%s%s\\n' ", ANSI_COLOR.DARK_GREY, ANSI_COLOR.RESET)
+
+		styled_cmd = fmt_prompt
+			.. vim.fn.shellescape(prompt_display)
+			.. get_sep()
+			.. fmt_line
+			.. vim.fn.shellescape(separator_line)
+			.. get_sep()
+			.. cmd_to_run
+	end
+
+	-- run command --
+	vim.fn.jobstart(styled_cmd, {
 		term = true,
 		cwd = task_to_run.cwd or M.config.cwd,
 		on_exit = function(_, exit_code, _)
