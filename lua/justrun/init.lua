@@ -77,8 +77,13 @@ local function get_sep()
 end
 
 ---@param t table A table/list of strings to join
+---@param sep string? A separator used to join strings
 ---@return string
-local function concat_with_sep(t)
+local function concat_with_sep(t, sep)
+	if sep then
+		return table.concat(t, sep)
+	end
+
 	return table.concat(t, get_sep())
 end
 
@@ -131,6 +136,7 @@ end
 ---@field desc string? Task description
 ---@field exit_on_success boolean? Close window on success
 ---@field cwd string? The task's current working directory
+---@field sep string? Separator to join task commands list. If nil uses the default_sep
 local JustTask = {}
 
 ---@alias JustTasksTable table<string, string | string[] | JustTask>[]
@@ -206,7 +212,7 @@ local function handle_task(task_data, all_tasks, depth)
 
 		-- if cmd is a list of strings
 		elseif type(task_data.cmd) == "table" and vim.islist(task_data.cmd) then
-			table.insert(commands_to_join, concat_with_sep(task_data.cmd))
+			table.insert(commands_to_join, concat_with_sep(task_data.cmd, task_data.sep))
 
 		-- if the task is a string or a nested JustTask
 		else
@@ -340,12 +346,17 @@ M.run = function(task_name)
 	local styled_cmd = ""
 
 	if is_windows then
+		---@type boolean
+		local is_powershell = vim.o.shell == "powershell.exe" or vim.o.shell == "pwsh.exe"
+
+		---@type string
+		local sep = is_powershell and "; " or " & "
 		styled_cmd = "echo "
 			.. vim.fn.shellescape(prompt_display)
-			.. get_sep()
+			.. sep
 			.. "echo "
 			.. vim.fn.shellescape(separator_line)
-			.. get_sep()
+			.. sep
 			.. cmd_to_run
 
 		-- add colors in unix based systems
@@ -364,10 +375,10 @@ M.run = function(task_name)
 
 		styled_cmd = fmt_prompt
 			.. vim.fn.shellescape(prompt_display)
-			.. get_sep()
+			.. "; "
 			.. fmt_line
 			.. vim.fn.shellescape(separator_line)
-			.. get_sep()
+			.. "; "
 			.. cmd_to_run
 	end
 
@@ -502,7 +513,7 @@ M.ui = function()
 
 				-- if the cmd is a list
 				if task.cmd and vim.islist(task.cmd) then
-					return item .. " (" .. concat_with_sep(task.cmd) .. ")"
+					return item .. " (" .. concat_with_sep(task.cmd, task.sep) .. ")"
 
 					-- if the cmd is a function
 				elseif task.cmd and type(task.cmd) == "function" then
