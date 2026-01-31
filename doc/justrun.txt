@@ -23,15 +23,66 @@ Complex example with type hinting: >lua
     local justrun = require("justrun")
 
     return justrun.create_tasks({
+        default = {
+            run_before = {"build"}, -- Run task build before the cmd
+            cmd = "./main",
+            cwd = "./src"
+        },
+
+        -- Default Separator (&&)
+        -- Resulting command: echo 'Hello, ' && echo 'world!'
+        greet = {"echo 'Hello, '", "echo 'world!'"},
+
         build = {
             cmd = "go build .",
             desc = "Build the project",
             cwd = "./src",
             exit_on_success = true
         },
+
         deploy = {
             run_before = { "build" },
             cmd = "echo 'Deploying...'"
+        },
+
+        run_args = {
+            -- Joins with space: "python main.py --verbose --dry-run"
+            cmd = {"python", "main.py", "--verbose", "--dry-run"},
+            sep = " ", -- Custom separator for the cmd list
+        },
+
+        -- Default Separator (&&)
+        build_all = {
+            -- Joins with &&: "cd build && cmake .. && make"
+            cmd = {"cd build", "cmake ..", "make"}
+        },
+
+        -- cmd could be a function to return a string | string[] | JustTask
+        -- Example: Manual string concatenation (Hard way)
+        dynamic_cmd = {
+            cmd = function()
+                local cmd = ""
+                for i=1, 5 do
+                    if i ~= 5 then
+                        cmd = cmd .."echo '" .. i .. "';"
+                    else
+                        cmd = cmd .. "echo '" .. i .. "'"
+                    end
+                end
+                return cmd
+            end
+        },
+
+        -- Equivalent to dynamic_cmd but using table/list (Easy way)
+        dynamic_cmd_with_sep = {
+            cmd = function()
+                local cmd_list = {}
+                for i=1, 5 do
+                    table.insert(cmd_list, "echo '" .. i .. "'")
+                end
+                return cmd_list
+            end,
+            sep = "; " -- Custom separator for the list
         }
     })
 <
@@ -71,6 +122,17 @@ You can configure the plugin via the setup function:
         max_depth = 20,              -- Max recursion depth for nested tasks
     })
 <
+
+4. Task Configuration Fields: ~
+
+    cmd             (string|string[]|function) The command to execute.
+    run_before      (table) List of task names to run before the current one.
+    cwd             (string) Working directory for the task.
+    sep             (string) Separator used to join items if `cmd` is a list.
+                    Defaults to `default_sep` config (usually "&&").
+                    Useful to join arguments with " " (space).
+    exit_on_success (boolean) Close terminal if exit code is 0.
+    desc            (string) Description for the UI menu.
 
 ==============================================================================
 vim:tw=78:ts=8:ft=help:norl:

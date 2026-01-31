@@ -121,11 +121,45 @@ return justrun.create_tasks({
         exit_on_success = true, -- Close terminal if successful
     },
 
+    run_args = {
+            -- Joins with space: "python main.py --verbose --dry-run"
+            cmd = {"python", "main.py", "--verbose", "--dry-run"},
+            sep = " ", -- Custom separator for the cmd list
+        },
+
+    -- Default Separator (&&)
+    build_all = {
+        -- Joins with &&: "cd build && cmake .. && make"
+        cmd = {"cd build", "cmake ..", "make"}
+    },
+
     -- Dynamic Command (Function)
-    greet = {
+    -- cmd could be a function to return a string | string[] | JustTask
+    -- Example: Manual string concatenation (Hard way)
+    dynamic_cmd = {
         cmd = function()
-            return "echo 'Hello from " .. os.date() .. "'"
+            local cmd = ""
+            for i=1, 5 do
+                if i ~= 5 then
+                    cmd = cmd .."echo '" .. i .. "';"
+                else
+                    cmd = cmd .. "echo '" .. i .. "'"
+                end
+            end
+            return cmd
         end
+    },
+
+    -- Equivalent to dynamic_cmd but using table/list (Easy way)
+    dynamic_cmd_with_sep = {
+        cmd = function()
+            local cmd_list = {}
+            for i=1, 5 do
+                table.insert(cmd_list, "echo '" .. i .. "'")
+            end
+            return cmd_list
+        end,
+        sep = "; " -- Custom separator for the list
     }
 })
 ```
@@ -138,6 +172,7 @@ return justrun.create_tasks({
 | `run_before` | `string[]` | List of other task **names** to run before this one. |
 | `cwd` | `string` | Directory to execute the command in. |
 | `exit_on_success`| `boolean` | If `true`, closes the split automatically on exit code 0. |
+| `sep` | `string` | Custom separator to join `cmd` list items (default: `&&`). |
 | `desc` | `string` | Description shown in the UI menu. |
 
 ## 🎮 Commands
