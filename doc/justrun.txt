@@ -1,0 +1,76 @@
+```text
+*justrun.txt* For Neovim.   Last change: 2024
+
+==============================================================================
+JUSTRUN.NVIM                                                    *justrun.nvim*
+
+A simple, flexible, and powerful task runner for Neovim. Define your project
+tasks in a local Lua file and run them easily inside a terminal buffer.
+
+                                                              *justrun-usage*
+1. Usage ~
+
+Create a file named `.justrun.lua` in your project root.
+
+Minimal example: >lua
+    return {
+        default = "echo 'Hello World'",
+        test = "npm test"
+    }
+<
+
+Complex example with type hinting: >lua
+    local justrun = require("justrun")
+
+    return justrun.create_tasks({
+        build = {
+            cmd = "go build .",
+            desc = "Build the project",
+            cwd = "./src",
+            exit_on_success = true
+        },
+        deploy = {
+            run_before = { "build" },
+            cmd = "echo 'Deploying...'"
+        }
+    })
+<
+
+                                                             *justrun-commands*
+2. Commands ~
+
+:JustRun [task_name]                                                *:JustRun*
+    Runs the specified task. If no argument is provided, runs the default task
+    configured in setup (default: "default").
+
+:JustRunUi                                                       *:JustRunUi*
+    Opens a selection menu using `vim.ui.select` with all available tasks found
+    in the configuration file.
+
+:JustRunLast                                                   *:JustRunLast*
+    Re-runs the last successfully executed task. Useful for TDD loops.
+
+:JustRunUnderCursor                                     *:JustRunUnderCursor*
+    Runs the task definition under the cursor. Must be triggered while editing
+    the `.justrun.lua` file. Requires nvim-treesitter.
+
+                                                               *justrun-config*
+3. Configuration ~
+
+You can configure the plugin via the setup function:
+>lua
+    require("justrun").setup({
+        filename = ".justrun.lua",   -- File to load tasks from
+        default_task = "default",    -- Default task name
+        cwd = ".",                   -- Default working directory
+        force_run = false,           -- Run first task if default missing
+        split_direction = "vertical",-- "vertical" or "horizontal"
+        split_size = 50,             -- Size of the split
+        exit_on_success = false,     -- Close terminal on success (code 0)
+        default_sep = "&&",          -- Separator for command chaining
+        max_depth = 20,              -- Max recursion depth for nested tasks
+    })
+<
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:
