@@ -9,6 +9,7 @@ A simple, flexible, and powerful task runner for Neovim, written entirely in Lua
 * **Flexible Task Definitions**: Tasks can be simple strings, lists of commands, or complex objects.
 * **Task Dependencies**: Use `run_before` to chain tasks (e.g., run `build` before `test`).
 * **Smart Auto-closing**: Configure tasks to close the terminal automatically on success.
+* **Placeholders**: Use variables like `${file}` to create flexible, context-aware tasks.
 * **Run Under Cursor**: Execute a specific task just by placing your cursor over its name in the config file.
 * **UI Menu**: Select tasks from a nice UI list (`vim.ui.select`).
 * **Recursion Protection**: Built-in protection against infinite loops in nested tasks.
@@ -21,7 +22,7 @@ Install using your favorite package manager. For [lazy.nvim](https://github.com/
 ```lua
 {
     "Arthur-Negrao-Smith/JustRun.nvim",
-    tag = "v1.1.0", -- Recommended to lock to the stable version
+    tag = "v1.2.0", -- Recommended to lock to the stable version
     dependencies = {
         "nvim-treesitter/nvim-treesitter", -- Required for :JustRunUnderCursor
     },
@@ -121,16 +122,22 @@ return justrun.create_tasks({
         exit_on_success = true, -- Close terminal if successful
     },
 
+    -- Default Separator (&&)
+    build_all = {
+        -- Joins with &&: "cd build && cmake .. && make"
+        cmd = {"cd build", "cmake ..", "make"}
+    },
+
+    -- Custom separator ( )
     run_args = {
             -- Joins with space: "python main.py --verbose --dry-run"
             cmd = {"python", "main.py", "--verbose", "--dry-run"},
             sep = " ", -- Custom separator for the cmd list
         },
 
-    -- Default Separator (&&)
-    build_all = {
-        -- Joins with &&: "cd build && cmake .. && make"
-        cmd = {"cd build", "cmake ..", "make"}
+    -- Placeholders
+    run_lua = {
+        cmd = "lua ${file}" -- JustRun replaces placeholder automatically
     },
 
     -- Dynamic Command (Function)
@@ -160,7 +167,7 @@ return justrun.create_tasks({
             return cmd_list
         end,
         sep = "; " -- Custom separator for the list
-    }
+    },
 })
 ```
 

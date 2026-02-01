@@ -2,12 +2,12 @@
 *justrun.txt* For Neovim.   Last change: 2024
 
 ==============================================================================
-JUSTRUN.NVIM                                                    *justrun.nvim*
+JUSTRUN.NVIM                                                     *justrun.nvim*
 
 A simple, flexible, and powerful task runner for Neovim. Define your project
 tasks in a local Lua file and run them easily inside a terminal buffer.
 
-                                                              *justrun-usage*
+                                                                *justrun-usage*
 1. Usage ~
 
 Create a file named `.justrun.lua` in your project root.
@@ -32,6 +32,16 @@ Complex example with type hinting: >lua
         -- Default Separator (&&)
         -- Resulting command: echo 'Hello, ' && echo 'world!'
         greet = {"echo 'Hello, '", "echo 'world!'"},
+
+        -- Placeholder could be used to handle the commands
+        -- `lua ${file}` is equivalent to `lua %`.
+        -- On windows, the symbol "%" alone doesn't works, so
+        -- use "${relativeFile}" instead. Other vim placeholders can
+        -- still used.
+        lua = {
+            -- JustRun replaces this placeholder automatically
+            cmd = "lua ${file}"
+        },
 
         build = {
             cmd = "go build .",
@@ -105,6 +115,7 @@ Complex example with type hinting: >lua
     Runs the task definition under the cursor. Must be triggered while editing
     the `.justrun.lua` file. Requires nvim-treesitter.
 
+
                                                                *justrun-config*
 3. Configuration ~
 
@@ -123,6 +134,7 @@ You can configure the plugin via the setup function:
     })
 <
 
+                                                                *justrun-tasks*
 4. Task Configuration Fields: ~
 
     cmd             (string|string[]|function) The command to execute.
@@ -134,5 +146,57 @@ You can configure the plugin via the setup function:
     exit_on_success (boolean) Close terminal if exit code is 0.
     desc            (string) Description for the UI menu.
 
+
+
+                                                         *justrun-placeholders*
+5. Placeholders ~
+
+You can use placeholders in your commands to make them dynamic. JustRun
+supports both VSCode-style variables and standard Vim filename modifiers.
+
+VSCode Style Variables (Recommended for cross-platform compatibility):
+
+    ${file}                      Absolute path of the current file.
+                                 Example: /home/user/project/src/main.py
+
+    ${fileBasename}              Filename with extension.
+                                 Example: main.py
+
+    ${fileBasenameNoExtension}   Filename without extension.
+                                 Example: main
+
+    ${fileDirname}               Directory containing the file.
+                                 Example: /home/user/project/src
+
+    ${relativeFile}              File path relative to the project root.
+                                 Example: src/main.py
+
+    ${workspaceFolder}           Root directory of the project (CWD).
+                                 Example: /home/user/project
+
+Vim Native Modifiers:
+
+    You can also use standard Vim modifiers like `%`, `%:p`, `%:t`, `%:r`.
+    See |filename-modifiers| for the full list.
+
+    NOTE regarding Windows: ~
+    On Windows, the `%` character is used for environment variables (e.g.,
+    %PATH%). To prevent conflicts, JustRun disables the usage of the bare `%`
+    symbol on Windows systems.
+
+    If you need cross-platform support, strictly use `${file}` or
+    `${relativeFile}` instead of `%`. Modifiers like `%:p` or `%:t` still work
+    on all systems.
+
+    Example: >lua
+        -- Good (Works everywhere)
+        cmd = "python ${file}"
+
+        -- Good (Vim style, works everywhere)
+        cmd = "python %:p"
+
+        -- Risky (Might fail on Windows)
+        cmd = "python %"
+    <
 ==============================================================================
 vim:tw=78:ts=8:ft=help:norl:

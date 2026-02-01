@@ -1,10 +1,26 @@
 local M = {}
 
+---@alias JustTaskFunc fun(): JustTask | string | string[]
+
+---@class JustTask
+---@field cmd string | string[] | JustTaskFunc | nil Commands to run
+---@field run_before string[]? Tasks to run before this one. (Only tasks name)
+---@field desc string? Task description
+---@field exit_on_success boolean? Close window on success
+---@field cwd string? The task's current working directory
+---@field sep string? Separator to join task commands list. If nil uses the default_sep
+local JustTask = {}
+
+---@alias JustTasksTable table<string, string | string[] | JustTask>[]
+
 M.config = {
 	--- Default file to load task definitions.
 	--- Default: ".justrun.lua"
 	---@type string
 	filename = ".justrun.lua",
+
+	-- TODO: Create filetype field in JustTaks and in Config to run files
+	-- TODO: Create :JustRunFile to run the current File
 
 	--- Task to run when use :JustRun is used without arguments
 	--- Default: "default"
@@ -102,6 +118,54 @@ local ANSI_COLOR = {
 	DARK_GREY = [=[\e[90m]=],
 }
 
+---@param cmd string Command to replace placeholders
+---@return string
+local function replace_placeholders(cmd)
+	---@type string
+	local current_file = vim.api.nvim_buf_get_name(0)
+
+	-- if does't have a file
+	if current_file == "" then
+		return cmd
+	end
+
+	-- replacements table like vscode
+	local replacements = {
+		["${file}"] = vim.fn.expand("%:p"), -- /home/user/main.py
+		["${fileBasename}"] = vim.fn.expand("%:t"), -- main.py
+		["${fileBasenameNoExtension}"] = vim.fn.expand("%:t:r"), -- main
+		["${fileDirname}"] = vim.fn.expand("%:p:h"), -- /home/user
+		["${relativeFile}"] = vim.fn.expand("%"), -- main.py (if the file is in root)
+		["${workspaceFolder}"] = vim.fn.getcwd(), -- /home/user/project (open folder by nvim)
+	}
+
+	for key, value in pairs(replacements) do
+		local escaped_key = key:gsub("([%-%^%$%%.%[%]%(%)%*%+%?])", "%%%1") -- create scapes to avoid
+		cmd = cmd:gsub(escaped_key, value)
+	end
+
+	cmd = cmd:gsub("%%:r", vim.fn.expand("%:r"))
+	cmd = cmd:gsub("%%:t", vim.fn.expand("%:t"))
+	cmd = cmd:gsub("%%:h", vim.fn.expand("%:h"))
+	cmd = cmd:gsub("%%:p", vim.fn.expand("%:p"))
+
+	-- disable the symbol '%' when he is alone on windows: `lua %` will not works.
+	-- prevent errors with windows envarioments variables like:
+	-- %USERNAME% -> main.luaUSERNAMEmain.lua
+	if not is_windows then
+		cmd = cmd:gsub("%%", vim.fn.expand("%"))
+	end
+
+	return cmd
+end
+
+--- A wrapper to process commands
+---@param cmd string Command to process
+---@return string
+local function process_cmd(cmd)
+	return replace_placeholders(cmd)
+end
+
 --- Get a buffer to run the task, recycling a window if possible
 ---@return integer|nil
 local function get_terminal_window()
@@ -128,19 +192,6 @@ local function get_terminal_window()
 	return state.buf
 end
 
----@alias JustTaskFunc fun(): JustTask | string | string[]
-
----@class JustTask
----@field cmd string | string[] | JustTaskFunc | nil Commands to run
----@field run_before string[]? Tasks to run before this one. (Only tasks name)
----@field desc string? Task description
----@field exit_on_success boolean? Close window on success
----@field cwd string? The task's current working directory
----@field sep string? Separator to join task commands list. If nil uses the default_sep
-local JustTask = {}
-
----@alias JustTasksTable table<string, string | string[] | JustTask>[]
-
 --- Recursively resolve the command string for a task
 ---@param task_data string | string[] | JustTask Current task to handle
 ---@param all_tasks JustTasksTable Table containing all tasks
@@ -156,11 +207,13 @@ local function handle_task(task_data, all_tasks, depth)
 	end
 
 	if type(task_data) == "string" then
-		return task_data, nil
+		return process_cmd(task_data), nil
 	end
 
 	if type(task_data) == "table" and vim.islist(task_data) then
-		return concat_with_sep(task_data), nil
+		---@type string[]
+		local processed_list = vim.tbl_map(process_cmd, task_data)
+		return concat_with_sep(processed_list), nil
 	end
 
 	---@type string[]
@@ -193,11 +246,13 @@ local function handle_task(task_data, all_tasks, depth)
 			local func_res = task_data.cmd()
 
 			if type(func_res) == "string" then
-				table.insert(commands_to_join, func_res)
+				table.insert(commands_to_join, process_cmd(func_res))
 
 				-- if cmd is table/list of strings
 			elseif type(func_res) == "table" and vim.islist(func_res) then
-				table.insert(commands_to_join, concat_with_sep(func_res))
+				---@type string[]
+				local processed_list = vim.tbl_map(process_cmd, task_data)
+				table.insert(commands_to_join, concat_with_sep(processed_list))
 
 			-- function returned a JustTask object
 			else
@@ -212,7 +267,9 @@ local function handle_task(task_data, all_tasks, depth)
 
 		-- if cmd is a list of strings
 		elseif type(task_data.cmd) == "table" and vim.islist(task_data.cmd) then
-			table.insert(commands_to_join, concat_with_sep(task_data.cmd, task_data.sep))
+			---@type string[]
+			local processed_list = vim.tbl_map(process_cmd, task_data.cmd)
+			table.insert(commands_to_join, concat_with_sep(processed_list, task_data.sep))
 
 		-- if the task is a string or a nested JustTask
 		else
@@ -346,8 +403,11 @@ M.run = function(task_name)
 	local styled_cmd = ""
 
 	if is_windows then
+		---@type string
+		local current_shell = vim.o.shell:lower()
+
 		---@type boolean
-		local is_powershell = vim.o.shell == "powershell.exe" or vim.o.shell == "pwsh.exe"
+		local is_powershell = (current_shell:find("powershell") or current_shell:find("pwsh")) and true or false
 
 		---@type string
 		local sep = is_powershell and "; " or " & "
