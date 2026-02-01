@@ -13,16 +13,33 @@ local JustTask = {}
 
 ---@alias JustTasksTable table<string, string | string[] | JustTask>[]
 
+---@class JustTaskConfig
+---@field filename string? Default file to load task definitions. Default: .justrun.lua
+---@field filetype JustTasksTable? Default table to run filetypes when :JustRunFile is used without arguments
+---@field default_task string? Task to run when :JustRun is used without arguments. Default: "default"
+---@field cwd string? Default woriking directory. This option can be overridden by the "cwd" field in task definition. Default: "."
+---@field force_run boolean? If arguments are missing and default task is not found, run the first available task. Default: false
+---@field split_direction "vertical" | "horizontal" | nil Orientation of the terminal split
+---@field exit_on_success boolean? Close the terminal if the task succeeds. This option can be overwritten in the task body. Default: false
+---@field default_sep string? Default separator to join tasks commands. This option can be overwritten in the task body. Default: "&&"
+---@field max_depth integer? Maximum recursion depth for nested tasks to prevent infinity loops. Use -1 to disable the limit (caution). Default: 20
+local JustTaskConfig = {}
+
 M.config = {
 	--- Default file to load task definitions.
 	--- Default: ".justrun.lua"
 	---@type string
 	filename = ".justrun.lua",
 
+	--- Default table to run filetypes when :JustRunFile is
+	--- used without arguments
+	---@type JustTasksTable
+	filetype = {},
+
 	-- TODO: Create filetype field in JustTaks and in Config to run files
 	-- TODO: Create :JustRunFile to run the current File
 
-	--- Task to run when use :JustRun is used without arguments
+	--- Task to run when :JustRun is used without arguments
 	--- Default: "default"
 	---@type string
 	default_task = "default",
