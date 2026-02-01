@@ -48,3 +48,18 @@ vim.api.nvim_create_user_command("JustRunUi", justrun.ui, {
 vim.api.nvim_create_user_command("JustRunLast", justrun.run_last, {
 	nargs = 0,
 })
+
+---@param opts vim.api.keyset.create_user_command.command_args
+vim.api.nvim_create_user_command("JustRunFile", function(opts)
+	---@type string?
+	local filename = opts.args
+
+	if filename == "" then
+		filename = nil
+	end
+
+	justrun.run_file(filename)
+end, {
+	nargs = "?",
+	complete = "file",
+})

@@ -16,9 +16,10 @@ local JustTask = {}
 ---@class JustTaskConfig
 ---@field filename string? Default file to load task definitions. Default: .justrun.lua
 ---@field filetype JustTasksTable? Default table to run filetypes when :JustRunFile is used without arguments
+---@field show_filetype_tasks boolean? Show the others filetype taks in :JustRunFind. Show only the current filetype task if false. Default: false
 ---@field default_task string? Task to run when :JustRun is used without arguments. Default: "default"
 ---@field cwd string? Default woriking directory. This option can be overridden by the "cwd" field in task definition. Default: "."
----@field force_run boolean? If arguments are missing and default task is not found, run the first available task. Default: false
+---@field force_run boolean? If arguments are missing, run default task, if is not found, run the first available task. Default: false
 ---@field split_direction "vertical" | "horizontal" | nil Orientation of the terminal split
 ---@field exit_on_success boolean? Close the terminal if the task succeeds. This option can be overwritten in the task body. Default: false
 ---@field default_sep string? Default separator to join tasks commands. This option can be overwritten in the task body. Default: "&&"
@@ -34,10 +35,17 @@ M.config = {
 	--- Default table to run filetypes when :JustRunFile is
 	--- used without arguments
 	---@type JustTasksTable
-	filetype = {},
+	filetype = {
+		lua = { cmd = "lua ${file}", desc = "Run current lua file" },
+		python = { cmd = "python ${file}", desc = "Run current python file" },
+		javascript = { cmd = "node ${file}", desc = "Run current javascript file" },
+	},
 
-	-- TODO: Create filetype field in JustTaks and in Config to run files
-	-- TODO: Create :JustRunFile to run the current File
+	-- TODO: implement show_filetype_tasks
+	--- Show the others filetype taks in :JustRunFind. Show only the current
+	--- filetype task if false. Default: false
+	---@type boolean
+	show_filetype_tasks = false,
 
 	--- Task to run when :JustRun is used without arguments
 	--- Default: "default"
@@ -50,7 +58,7 @@ M.config = {
 	---@type string
 	cwd = ".",
 
-	--- If arguments are missing and the default task is not found,
+	--- If arguments are missing, run the default task, if it is not found,
 	--- run the first available task in the table.
 	--- Default: false
 	---@type boolean
@@ -305,8 +313,8 @@ local function handle_task(task_data, all_tasks, depth)
 end
 
 --- Load all tasks from the configuration file
----@return JustTasksTable commands
----@return string? err
+---@return JustTasksTable commands All tasks in a table. Return a empty table is error occurs
+---@return string? err Error message
 M.load_tasks = function()
 	---@type string
 	local workdir = vim.fn.getcwd()
@@ -355,8 +363,8 @@ M.run = function(task_name)
 	---@type boolean
 	local user_provide_args = (task_name ~= nil and task_name ~= "")
 
-	---@type string | JustTask | nil
-	local task_to_run = tasks_table[target_task]
+	---@type string | string[] | JustTask | nil
+	local task_to_run = tasks_table[target_task] or M.config.filetype[target_task]
 
 	-- handle missing task
 	if not task_to_run then
@@ -541,6 +549,57 @@ M.run_under_cursor = function()
 	task_name = task_name:gsub("[%[%]\"']", "")
 
 	M.run(task_name)
+end
+
+--- Run a file with JustRun tasks. Run the current file if no privede arguments
+---@param filename string? Name of the file to run. Run the current file if nil
+---@return nil
+M.run_file = function(filename)
+	---@type JustTasksTable
+	local tasks, _ = M.load_tasks()
+
+	if filename then
+		---@type string?
+		local filetype = vim.filetype.match({ filename = filename })
+
+		if not filetype then
+			vim.notify("Neovim can not to infer filetype of the file: " .. filename, vim.log.levels.ERROR)
+			return
+		end
+
+		---@type string | string[] | JustTask | nil
+		local current_filetype_task = tasks[filetype] or M.config.filetype[filetype]
+
+		if not current_filetype_task then
+			vim.notify(
+				"Filetype '" .. filetype .. "' does not have a task to run the file: " .. filename,
+				vim.log.levels.ERROR
+			)
+			return
+		end
+
+		M.run(filetype)
+		return
+	end
+
+	---@type string?
+	local filetype = vim.filetype.match({ buf = 0 })
+
+	if not filetype then
+		vim.notify("Neovim can not to infer filetype of the current file: " .. vim.fn.expand("%"), vim.log.levels.ERROR)
+		return
+	end
+
+	local current_filetype_task = tasks[filetype] or M.config.filetype[filetype]
+	if not current_filetype_task then
+		vim.notify(
+			"Filetype '" .. filetype .. "' does not have a task to run the current file: " .. vim.fn.expand("%"),
+			vim.log.levels.ERROR
+		)
+		return
+	end
+
+	M.run(filetype)
 end
 
 --- Open a UI menu to select a task
