@@ -10,6 +10,7 @@ A simple, flexible, and powerful task runner for Neovim, written entirely in Lua
 * **Task Dependencies**: Use `run_before` to chain tasks (e.g., run `build` before `test`).
 * **Smart Auto-closing**: Configure tasks to close the terminal automatically on success.
 * **Placeholders**: Use variables like `${file}` to create flexible, context-aware tasks.
+* **Run Files By Type**: Create custom tasks for each filetype and run. See neovim [filetypes](https://neovim.io/doc/user/filetype.html).
 * **Run Under Cursor**: Execute a specific task just by placing your cursor over its name in the config file.
 * **UI Menu**: Select tasks from a nice UI list (`vim.ui.select`).
 * **Recursion Protection**: Built-in protection against infinite loops in nested tasks.
@@ -22,7 +23,7 @@ Install using your favorite package manager. For [lazy.nvim](https://github.com/
 ```lua
 {
     "Arthur-Negrao-Smith/JustRun.nvim",
-    tag = "v1.2.0", -- Recommended to lock to the stable version
+    tag = "v1.4.1", -- Recommended to lock to the stable version
     dependencies = {
         "nvim-treesitter/nvim-treesitter", -- Required for :JustRunUnderCursor
     },
@@ -33,9 +34,11 @@ Install using your favorite package manager. For [lazy.nvim](https://github.com/
             split_size = 50,
         })
     end,
-    cmd = { "JustRun", "JustRunUi", "JustRunLast", "JustRunUnderCursor" },
+    cmd = { "JustRun", "JustRunUi", "JustRunLast", "JustRunUnderCursor", "JustRunFile" },
     keys = {
-        { "<leader>jr", "<cmd>JustRunUi<cr>", desc = "JustRun: Open Menu" },
+        { "<leader>jd", "<cmd>JustRun<cr>", desc = "JustRun: Run default task" },
+        { "<leader>jf", "<cmd>JustRunFile<cr>", desc = "JustRun: Run current file" },
+        { "<leader>js", "<cmd>JustRunFind<cr>", desc = "JustRun: Open Find Menu" },
         { "<leader>jl", "<cmd>JustRunLast<cr>", desc = "JustRun: Rerun Last" },
     },
 }
@@ -50,13 +53,27 @@ require("justrun").setup({
     -- Default file to load tasks from
     filename = ".justrun.lua",
 
+    -- Default tasks for each filetype
+    -- Use the filetype name to create each task
+    -- see default filetype names page of the neovim:
+    --  https://neovim.io/doc/user/filetype.html#_3.-docs-for-the-default-filetype-plugins.
+    filetype = {
+        lua = { cmd = "lua ${file}", desc = "Run current lua file" },
+        python = { cmd = "python ${file}", desc = "Run current python file" },
+        javascript = { cmd = "node ${file}", desc = "Run current javascript file" },
+        --- many others...
+    },
+
+    -- Show all filetype tasks on the task find menu
+    show_filetype_tasks = false,
+
     -- Default task to run if :JustRun is called without args
     default_task = "default",
 
     -- Current working directory (can be overwritten per task)
     cwd = ".",
 
-    -- If true, runs the first available task if default_task is missing
+    -- If true, runs the default_taks. Runs first available task if default_task is missing
     force_run = false,
 
     -- Terminal orientation: "vertical" | "horizontal"
@@ -82,6 +99,7 @@ require("justrun").setup({
 Create a file named `.justrun.lua` in the root of your project.
 
 ### 1. Minimal Example
+
 You can return a simple table where keys are task names and values are commands.
 
 ```lua
@@ -94,6 +112,7 @@ return {
 ```
 
 ### 2. Complex Example with Type Hinting
+
 Use `justrun.create_tasks` to enable autocomplete (LSP) for available fields.
 
 ```lua
@@ -136,9 +155,19 @@ return justrun.create_tasks({
         },
 
     -- Placeholders
-    run_lua = {
-        cmd = "lua ${file}" -- JustRun replaces placeholder automatically
+    run_script = {
+        -- JustRun replaces placeholders automatically
+        cmd = "lua ${file} && echo '${fileBasename}'"
     },
+
+    -- Filetypes
+    -- :JustRunFile can infer the current filetype to run the correct task.
+    -- JustRun.nvim use the filetype tasks with the same filetype name to 
+    -- run automatically.
+    python = {
+        cmd = "python ${file}",
+        desc = "Run current python file"
+    }
 
     -- Dynamic Command (Function)
     -- cmd could be a function to return a string | string[] | JustTask
@@ -182,18 +211,74 @@ return justrun.create_tasks({
 | `sep` | `string` | Custom separator to join `cmd` list items (default: `&&`). |
 | `desc` | `string` | Description shown in the UI menu. |
 
+### Placeholders
+
+The JustRun.nvim supports placeholder to create flexible, context-aware tasks. List of supported placeholders:
+
+| Vim style | VS-Code style | Description |
+| :--- | :--- | :--- |
+| `%` | `${relativeFile}` | Relative path to current file. |
+| `%:p` | `${file}` | Absolute path to current file. |
+| `%:r` | `${fileNoExtension}` | Absolute path to current file without extension (e.g., /home/user/project/main). |
+| `%:t` | `${fileBasename}` | Filename without path (e.g., main.py) |
+| `%:t:r` | `${fileBasenameNoExtension}` | Filename without path and no extension (e.g., /home/user/project/main.py -> main). |
+| `%:p:h` | `${fileDirname}` | Directory name of the current file. |
+| None | `${workspaceFolder}` | Absolute path to workspace opened by neovim. |
+
+See [filename-modifiers](https://neovim.io/doc/user/cmdline.html#filename-modifiers) to learn about Vim style placeholders.
+
+### Filetypes
+
+The JustRun.nvim supports running files by the filetype. This option can be useful to run default files without extra code. Example:
+
+```lua
+    require("justrun").setup({
+        -- use this keyword to create a table with all default filetype tasks
+        filetype = {
+            lua = {
+                cmd = "lua ${file}",
+                desc = "Run the current lua file",
+            },
+            python = {
+                cmd = "python %{file}",
+                desc = "Run the current python file",
+            },
+            -- filetype tasks could be string, string[] or JustTask
+            javascript = "node %{file}",
+            }
+        }
+    })
+```
+
+Additionally, you can also overwrite the default filetype task using the filetype name in your tasks table. Example:
+
+```lua
+local justrun = require("justrun")
+
+justrun.create_tasks({
+    -- the task must have the same name of the filetype name task to overwrite the default filetype task
+    python = {
+        cmd = "echo 'Runing the python file' && python ${file}",
+        desc = "Run the current python file",
+    }
+})
+```
+
+Whenever the command `:JustRunFile` is called, the filetype will be inferred by the neovim and the JustRun.nvim will automatically search the correct filetype task to this file. See [neovim filetypes](https://neovim.io/doc/user/filetype.html) to learn more about filetypes.
+
 ## 🎮 Commands
 
 | Command | Arguments | Description |
 | :--- | :--- | :--- |
 | `:JustRun` | `[task_name]` | Runs the specified task. If empty, runs `default_task`. |
-| `:JustRunUi` | None | Opens a selection menu (UI) with all available tasks. |
-| `:JustRunLast`| None | Re-runs the last executed task. Great for TDD. |
+| `:JustRunFind` | None | Opens a selection menu (UI) with all available tasks. |
+| `:JustRunLast` | None | Re-runs the last executed task. Great for TDD. |
 | `:JustRunUnderCursor` | None | Runs the task defined under the cursor in `.justrun.lua`. |
+| `:JustRunFile` | `[file_name]` | Runs the file using a filetype task. If empty, tries run the current file. |
 
 ## 🤝 Contributing
 
 Pull requests are welcome! The codebase is written entirely in Lua and documented in English. If you find a bug or have a feature request, please open an issue.
 
 ---
-**License**: GNU v3.0
+**License**: GNU GPL-3.0

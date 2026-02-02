@@ -1,12 +1,13 @@
-```text
-*justrun.txt* For Neovim.   Last change: 2024
+*justrun.nvim.txt* For Neovim.                                Last change: 2026
 
-==============================================================================
-JUSTRUN.NVIM                                                     *justrun.nvim*
+===============================================================================
+JustRun.nvim                                                     *justrun.nvim*
 
 A simple, flexible, and powerful task runner for Neovim. Define your project
 tasks in a local Lua file and run them easily inside a terminal buffer.
 
+
+===============================================================================
                                                                 *justrun-usage*
 1. Usage ~
 
@@ -32,6 +33,12 @@ Complex example with type hinting: >lua
         -- Default Separator (&&)
         -- Resulting command: echo 'Hello, ' && echo 'world!'
         greet = {"echo 'Hello, '", "echo 'world!'"},
+
+        -- Create a custom task to python filetype. See more: |ftplugin-docs|
+        python = {
+            cmd = "python main.py",
+            desc = "Run the main.py"
+        },
 
         -- Placeholder could be used to handle the commands
         -- `lua ${file}` is equivalent to `lua %`.
@@ -97,16 +104,20 @@ Complex example with type hinting: >lua
     })
 <
 
+
+
+===============================================================================
                                                              *justrun-commands*
 2. Commands ~
 
-:JustRun [task_name]                                                *:JustRun*
+:JustRun [task_name]                                                 *:JustRun*
     Runs the specified task. If no argument is provided, runs the default task
     configured in setup (default: "default").
 
-:JustRunUi                                                       *:JustRunUi*
+:JustRunFind                                                       *:JustRunUi*
     Opens a selection menu using `vim.ui.select` with all available tasks found
-    in the configuration file.
+    in the configuration file and filetypes task if `show_filetype_tasks` are 
+    enabled.
 
 :JustRunLast                                                   *:JustRunLast*
     Re-runs the last successfully executed task. Useful for TDD loops.
@@ -116,6 +127,8 @@ Complex example with type hinting: >lua
     the `.justrun.lua` file. Requires nvim-treesitter.
 
 
+
+===============================================================================
                                                                *justrun-config*
 3. Configuration ~
 
@@ -123,6 +136,8 @@ You can configure the plugin via the setup function:
 >lua
     require("justrun").setup({
         filename = ".justrun.lua",   -- File to load tasks from
+        filetype = {},               -- Table with tasks to run filetypes
+        show_filetype_tasks = false, -- Show the filetype tasks on find menu
         default_task = "default",    -- Default task name
         cwd = ".",                   -- Default working directory
         force_run = false,           -- Run first task if default missing
@@ -134,6 +149,9 @@ You can configure the plugin via the setup function:
     })
 <
 
+
+
+===============================================================================
                                                                 *justrun-tasks*
 4. Task Configuration Fields: ~
 
@@ -148,6 +166,7 @@ You can configure the plugin via the setup function:
 
 
 
+===============================================================================
                                                          *justrun-placeholders*
 5. Placeholders ~
 
@@ -157,6 +176,10 @@ supports both VSCode-style variables and standard Vim filename modifiers.
 VSCode Style Variables (Recommended for cross-platform compatibility):
 
     ${file}                      Absolute path of the current file.
+                                 Example: /home/user/project/src/main.py
+
+    ${fileNoExtension}           Absolute path of the current file without
+                                 extension.
                                  Example: /home/user/project/src/main.py
 
     ${fileBasename}              Filename with extension.
@@ -197,6 +220,34 @@ Vim Native Modifiers:
 
         -- Risky (Might fail on Windows)
         cmd = "python %"
-    <
-==============================================================================
+<
+
+
+
+===============================================================================
+                                                            *justrun-filetypes*
+6. Filetypes ~
+
+Each file has a corresponding filetype, JustRun can run files using the
+filetype inference by neovim api. Using this powerfull tool, you can run any
+filetype wich neovim can to identify. The command `:JustRunFile` can be used to
+run the current file (if no provide arguments) or a specific file (provide
+argument). See the |ftplugin-docs| to see all filetypes supported by neovim.
+
+    Example: >lua
+        -- The task must has a name equals the current filetype
+        python = {
+            cmd = "python ${file}",
+            desc = "Run the current python file"
+        },
+
+        -- Use :JustRunFile to run the current file. The JustRun will runs
+        -- this task if the current filetype is 'lua'.
+        lua = {
+            cmd = "lua ${file}",
+            desc = "Run the current lua file"
+        }
+<
+
+===============================================================================
 vim:tw=78:ts=8:ft=help:norl:
