@@ -94,7 +94,7 @@ M.config = {
 }
 
 --- Default setup function
----@param opts table?
+---@param opts JustTaskConfig? All custom configs table
 ---@return nil
 M.setup = function(opts)
 	M.config = vim.tbl_deep_extend("force", M.config, opts or {})
@@ -157,6 +157,7 @@ local function replace_placeholders(cmd)
 	-- replacements table like vscode
 	local replacements = {
 		["${file}"] = vim.fn.expand("%:p"), -- /home/user/main.py
+		["${fileNoExtension}"] = vim.fn.expand("%:r"), -- /home/user/main
 		["${fileBasename}"] = vim.fn.expand("%:t"), -- main.py
 		["${fileBasenameNoExtension}"] = vim.fn.expand("%:t:r"), -- main
 		["${fileDirname}"] = vim.fn.expand("%:p:h"), -- /home/user
@@ -347,12 +348,15 @@ M.run = function(task_name)
 	---@type JustTasksTable, string?
 	local tasks_table, err = M.load_tasks()
 
-	if err then
+	---@type boolean
+	local is_filetype = (task_name ~= nil and M.config.filetype[task_name] ~= nil)
+
+	if err and not is_filetype then
 		vim.notify(err, vim.log.levels.ERROR)
 		return
 	end
 
-	if vim.tbl_isempty(tasks_table) then
+	if vim.tbl_isempty(tasks_table) and not is_filetype then
 		vim.notify("Undefined error to load the tasks", vim.log.levels.ERROR)
 		return
 	end

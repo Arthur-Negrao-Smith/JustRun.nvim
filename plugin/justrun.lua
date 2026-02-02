@@ -45,6 +45,10 @@ vim.api.nvim_create_user_command("JustRunUi", justrun.ui, {
 	nargs = 0,
 })
 
+vim.api.nvim_create_user_command("JustRunFind", justrun.ui, {
+	nargs = 0,
+})
+
 vim.api.nvim_create_user_command("JustRunLast", justrun.run_last, {
 	nargs = 0,
 })
