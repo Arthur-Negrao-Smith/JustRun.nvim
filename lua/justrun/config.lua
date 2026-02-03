@@ -1,6 +1,6 @@
 local M = {}
 
----@type JustTaskConfig
+---@type JustConfig
 M.config = {
   --- Default file to load task definitions.
   --- Default: ".justrun.lua"
@@ -83,10 +83,11 @@ M.config = {
 }
 
 --- Default setup function
----@param opts JustTaskConfig? All custom table configs
+---@param opts JustConfig? All custom table configs
 ---@return nil
 M.setup = function(opts)
   M.config = vim.tbl_deep_extend("force", M.config, opts or {})
 end
 
+---@cast M JustConfig
 return M
