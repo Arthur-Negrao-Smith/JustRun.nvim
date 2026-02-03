@@ -59,12 +59,32 @@ M.is_running = function(task_name)
 end
 
 ---@private Load a task in global state
----@param task_name string
+---@param task_name string Target task name
 ---@param task string | string[] | JustTask
 ---@return nil
 M.load_task = function(task_name, task)
 	if M.loaded_tasks[task_name] == nil then
 		M.loaded_tasks[task_name] = JustTaskState:new(task)
+	end
+end
+
+--- Unload a task in global state
+---@param task_name string Target task name
+---@return nil
+M.unload_task = function(task_name)
+	---@type JustTaskState
+	local task_state = M.loaded_tasks[task_name]
+
+	if not task_state then
+		return
+	end
+
+	if task_state.task_win and vim.api.nvim_win_is_valid(task_state.task_win) then
+		vim.api.nvim_win_close(task_state.task_win, true)
+	end
+
+	if task_state.task_buf and vim.api.nvim_buf_is_valid(task_state.task_buf) then
+		vim.api.nvim_buf_delete(task_state.task_buf, { force = true })
 	end
 end
 
@@ -79,7 +99,7 @@ M.active_task = function(task_name, task)
 end
 
 --- Change a State of a task to a finished state: success or fail
----@param task_name string
+---@param task_name string Target task name
 ---@param task_state "success" | "fail"
 ---@return nil
 M.finish_task = function(task_name, task_state)
@@ -184,17 +204,7 @@ M.create_task_window = function(task_name)
 		return nil, "Undefined error to create a buffer"
 	end
 
-	---@type vim.api.keyset.win_config
-	local opts = {
-		relative = "editor",
-		width = config.terminal_width,
-		height = config.terminal_height,
-		col = config.terminal_height,
-		row = config.terminal_width,
-		anchor = "NW",
-	}
-
-	win = vim.api.nvim_open_win(buf, false, opts) -- get the current buffer
+	win = vim.api.nvim_open_win(buf, false, config.task_terminal_opts)
 
 	if win == 0 then
 		return nil, "Error to create a terminal task window by neovim api"
