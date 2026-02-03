@@ -1,6 +1,5 @@
 local M = {}
 
----@type JustConfig
 M.config = {
   --- Default file to load task definitions.
   --- Default: ".justrun.lua"

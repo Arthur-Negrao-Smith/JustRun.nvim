@@ -82,3 +82,4 @@
 ---@field default_sep string? Default separator to join tasks commands. This option can be overwritten in the task body. Default: "&&".
 ---@field max_depth integer? Maximum recursion depth for nested tasks to prevent infinity loops. Use -1 to disable the limit (caution). Default: 20.
 ---@field task_terminal_opts vim.api.keyset.win_config Configs to the floating terminal.
+---@field setup fun(opts: JustConfig?): nil Default plugin setup function
