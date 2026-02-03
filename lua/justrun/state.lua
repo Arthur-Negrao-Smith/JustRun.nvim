@@ -5,7 +5,7 @@ local JustTaskState = {}
 JustTaskState.__index = JustTaskState
 
 --- Create a new JustTaskState
----@param task string | string[] | JustTask Target task
+---@param task JustRunnable Target task
 ---@return JustTaskState
 function JustTaskState:new(task)
   ---@type JustTaskState
@@ -19,11 +19,6 @@ function JustTaskState:new(task)
   return instance
 end
 
----@class JustState JustRun plugin global state
----@field private dashboard_buf integer? Buffer of the dashboard
----@field private dashboard_win integer? Window of the dashboard
----@field private last_task string? Last task executed
----@field private loaded_tasks table<string, JustTaskState> All loaded tasks
 local M = {
   ---@type integer?
   dashboard_buf = nil,
@@ -40,7 +35,7 @@ local M = {
   loaded_tasks = {},
 }
 
---- Check if a task is running
+--- Check if the task is running
 ---@param task_name string Name of the task to check
 ---@return boolean
 M.is_running = function(task_name)
@@ -208,7 +203,7 @@ M.create_task_window = function(task_name)
   return win, nil
 end
 
---- Get the task buffer
+--- Get the terminal task buffer
 ---@param task_name string Target task name
 ---@return integer?, string? (buffer, error) Terminal task buffer and error
 M.get_task_buffer = function(task_name)
@@ -228,4 +223,5 @@ M.get_task_window = function(task_name)
   return win, err
 end
 
+---@cast M JustState
 return M
