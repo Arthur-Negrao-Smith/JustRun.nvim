@@ -1,69 +1,69 @@
 if not pcall(require, "justrun") then
-	return
+  return
 end
 
-local justrun = require("justrun")
+local justrun = require "justrun"
 
 ---@param opts vim.api.keyset.create_user_command.command_args
 vim.api.nvim_create_user_command("JustRun", function(opts)
-	---@type string?
-	local args = opts.args
+  ---@type string?
+  local args = opts.args
 
-	if args == "" then
-		args = nil
-	end
+  if args == "" then
+    args = nil
+  end
 
-	justrun.run(args)
+  justrun.run(args)
 end, {
-	nargs = "?", -- just 1 or 0 arguments
-	complete = function(ArgLead, _, _)
-		local tasks, _ = justrun.load_tasks()
+  nargs = "?", -- just 1 or 0 arguments
+  complete = function(ArgLead, _, _)
+    local tasks, _ = justrun.load_tasks()
 
-		if not tasks then
-			return {}
-		end
+    if not tasks then
+      return {}
+    end
 
-		local task_keys = vim.tbl_keys(tasks)
-		table.sort(task_keys)
+    local task_keys = vim.tbl_keys(tasks)
+    table.sort(task_keys)
 
-		local matches = {}
-		for _, key in ipairs(task_keys) do
-			if key:sub(1, #ArgLead) == ArgLead then
-				table.insert(matches, key)
-			end
-		end
+    local matches = {}
+    for _, key in ipairs(task_keys) do
+      if key:sub(1, #ArgLead) == ArgLead then
+        table.insert(matches, key)
+      end
+    end
 
-		return matches
-	end,
+    return matches
+  end,
 })
 
 vim.api.nvim_create_user_command("JustRunUnderCursor", justrun.run_under_cursor, {
-	nargs = 0,
+  nargs = 0,
 })
 
 vim.api.nvim_create_user_command("JustRunUi", justrun.ui, {
-	nargs = 0,
+  nargs = 0,
 })
 
 vim.api.nvim_create_user_command("JustRunFind", justrun.ui, {
-	nargs = 0,
+  nargs = 0,
 })
 
 vim.api.nvim_create_user_command("JustRunLast", justrun.run_last, {
-	nargs = 0,
+  nargs = 0,
 })
 
 ---@param opts vim.api.keyset.create_user_command.command_args
 vim.api.nvim_create_user_command("JustRunFile", function(opts)
-	---@type string?
-	local filename = opts.args
+  ---@type string?
+  local filename = opts.args
 
-	if filename == "" then
-		filename = nil
-	end
+  if filename == "" then
+    filename = nil
+  end
 
-	justrun.run_file(filename)
+  justrun.run_file(filename)
 end, {
-	nargs = "?",
-	complete = "file",
+  nargs = "?",
+  complete = "file",
 })
