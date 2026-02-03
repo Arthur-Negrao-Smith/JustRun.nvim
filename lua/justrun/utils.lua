@@ -79,6 +79,34 @@ M.process_cmd = function(cmd)
   return M.replace_placeholders(cmd)
 end
 
+--- Load all tasks like a table from the configuration file
+---@return JustTasksTable commands Table with runnable tasks. Return a empty table is error occurs
+---@return string? err Error message
+M.load_tasks_table = function()
+  ---@type string
+  local workdir = vim.fn.getcwd()
+
+  ---@type string
+  local tasks_file = workdir .. "/" .. config.filename
+
+  if vim.fn.filereadable(tasks_file) == 0 then
+    return {}, "File " .. config.filename .. " not found in root workdir: " .. workdir
+  end
+
+  ---@type boolean, string[]
+  local status, result = pcall(dofile, tasks_file)
+
+  if not status then
+    return {}, "Syntax error in " .. config.filename .. ": " .. tostring(result)
+  end
+
+  if type(result) ~= "table" then
+    return {}, "The file " .. config.filename .. " must return a Lua table."
+  end
+
+  return result, nil
+end
+
 --- ANSI colors to unix terminal
 ---@type table<string, string>
 M.ANSI_COLORS = {
