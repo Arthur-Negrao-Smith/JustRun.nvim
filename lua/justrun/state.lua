@@ -129,6 +129,32 @@ M.get_loaded_task = function(task_name)
 	return M.loaded_tasks[task_name].task
 end
 
+---@private Create a buffer to the task
+---@param task_name string
+---@return integer, string? (buffer, error)
+M.create_task_buffer = function(task_name)
+	local task_state = M.loaded_tasks[task_name]
+	---@type integer?
+	local buf = task_state.task_buf
+	---@type string?
+	local error = nil
+
+	if buf then
+		return buf, nil
+	end
+
+	buf = vim.api.nvim_create_buf(false, true)
+
+	if buf == 0 then
+		error = "Error to create a buffer by neovim api"
+		return -1, error
+	end
+
+	task_state.task_buf = buf
+
+	return buf, nil
+end
+
 --- Get the task buffer
 ---@param task_name string Target task name
 ---@return integer? buffer Terminal task buffer
