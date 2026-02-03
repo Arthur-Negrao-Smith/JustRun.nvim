@@ -1,6 +1,8 @@
+local config = require("justrun.config")
+
 ---@alias JustTaskStatus "success" | "fail" | "running"
 
----@class JustTaskState
+---@class JustTaskState Global state of the task
 ---@field task string | string[] | JustTask The task to run
 ---@field status JustTaskStatus State of the task
 ---@field task_buf integer? Terminal task buffer
@@ -9,7 +11,8 @@ local JustTaskState = {}
 
 JustTaskState.__index = JustTaskState
 
----@param task string | string[] | JustTask
+--- Create a new JustTaskState
+---@param task string | string[] | JustTask Target task
 ---@return JustTaskState
 function JustTaskState:new(task)
 	---@type JustTaskState
@@ -129,13 +132,16 @@ M.get_loaded_task = function(task_name)
 	return M.loaded_tasks[task_name].task
 end
 
----@private Create a buffer to the task
----@param task_name string
----@return integer, string? (buffer, error)
+---@private Create a buffer to the task of get the task buffer if not nil
+---@param task_name string Target task name
+---@return integer?, string? (buffer, error)
 M.create_task_buffer = function(task_name)
+	---@type JustTaskState
 	local task_state = M.loaded_tasks[task_name]
+
 	---@type integer?
 	local buf = task_state.task_buf
+
 	---@type string?
 	local error = nil
 
@@ -147,7 +153,7 @@ M.create_task_buffer = function(task_name)
 
 	if buf == 0 then
 		error = "Error to create a buffer by neovim api"
-		return -1, error
+		return nil, error
 	end
 
 	task_state.task_buf = buf
@@ -155,18 +161,68 @@ M.create_task_buffer = function(task_name)
 	return buf, nil
 end
 
+---@private Create a window to the task or get the task window if not nil
+---@param task_name string Target task name
+---@return integer?, string? (buffer, error)
+M.create_task_window = function(task_name)
+	local task_status = M.loaded_tasks[task_name]
+	---@type integer?
+	local win = task_status.task_win
+
+	if win then
+		return win, nil
+	end
+
+	---@type integer?, string?
+	local buf, err = M.get_task_buffer(task_name)
+
+	if err then
+		return nil, err
+	end
+
+	if not buf then
+		return nil, "Undefined error to create a buffer"
+	end
+
+	---@type vim.api.keyset.win_config
+	local opts = {
+		relative = "editor",
+		width = config.terminal_width,
+		height = config.terminal_height,
+		col = config.terminal_height,
+		row = config.terminal_width,
+		anchor = "NW",
+	}
+
+	win = vim.api.nvim_open_win(buf, false, opts) -- get the current buffer
+
+	if win == 0 then
+		return nil, "Error to create a terminal task window by neovim api"
+	end
+
+	M.loaded_tasks[task_name].task_win = win
+
+	return win, nil
+end
+
 --- Get the task buffer
 ---@param task_name string Target task name
----@return integer? buffer Terminal task buffer
+---@return integer?, string? (buffer, error) Terminal task buffer and error
 M.get_task_buffer = function(task_name)
-	return M.loaded_tasks[task_name].task_buf
+	---@type integer?, string?
+	local buf, err = M.create_task_buffer(task_name)
+
+	return buf, err
 end
 
 --- Get the terminal task window
 ---@param task_name string Target task name
----@return integer? window Terminal task window
+---@return integer?, string? (window, error) Terminal task window and error
 M.get_task_window = function(task_name)
-	return M.loaded_tasks[task_name].task_win
+	---@type integer?, string?
+	local win, err = M.create_task_window(task_name)
+
+	return win, err
 end
 
 return M
