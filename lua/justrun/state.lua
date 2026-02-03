@@ -1,12 +1,5 @@
 local config = require("justrun.config")
 
----@alias JustTaskStatus "success" | "fail" | "running"
-
----@class JustTaskState Global state of the task
----@field task string | string[] | JustTask The task to run
----@field status JustTaskStatus State of the task
----@field task_buf integer? Terminal task buffer
----@field task_win integer? Terminal task window
 local JustTaskState = {}
 
 JustTaskState.__index = JustTaskState
@@ -185,9 +178,9 @@ end
 ---@param task_name string Target task name
 ---@return integer?, string? (buffer, error)
 M.create_task_window = function(task_name)
-	local task_status = M.loaded_tasks[task_name]
+	local task_state = M.loaded_tasks[task_name]
 	---@type integer?
-	local win = task_status.task_win
+	local win = task_state.task_win
 
 	if win then
 		return win, nil
