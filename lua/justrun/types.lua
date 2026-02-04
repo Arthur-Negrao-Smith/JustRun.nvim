@@ -57,14 +57,24 @@
 ---
 ---@field private create_task_buffer fun(task_name: string): (integer?, string?) Creates or retrieves the task buffer (Internal).
 ---@field private create_task_window fun(task_name: string): (integer?, string?) Creates or retrieves the task window (Internal).
----@field get_task_buffer fun(task_name: string): (integer?, string?) Safe wrapper to get the task buffer ID.
----@field get_task_window fun(task_name: string): (integer?, string?) Safe wrapper to get the task window ID.
+---@field get_task_buffer fun(task_name: string, force: boolean?): (integer?, string?) Safe wrapper to get the task buffer ID.
+---@field get_task_window fun(task_name: string, force: boolean?): (integer?, string?) Safe wrapper to get the task window ID.
 
 ---@class JustTaskState Tracks the runtime execution state of a task instance.
 ---@field task JustRunnable The a runnable task to execute.
 ---@field status JustTaskStatus State of the task.
 ---@field task_buf integer? Terminal task buffer.
 ---@field task_win integer? Terminal task window.
+
+-- ============================
+-- ========= RUNNER ===========
+-- ============================
+
+---@class JustRunner The core of the JustRun. A runner to execute any task.
+---@field run fun(task_name: string?): nil Run a task. Runs default task if task_name is nil.
+---@field run_last fun(): nil Run the last task executed.
+---@field run_file fun(filename: string?): nil Run a file by filetype.
+---@field run_under_cursor fun(): nil Run a task under the cursor.
 
 -- ============================
 -- ====== CONFIGURATION =======
