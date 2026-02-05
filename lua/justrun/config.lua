@@ -1,6 +1,6 @@
 local M = {}
 
-M.config = {
+M = {
   --- Default file to load task definitions.
   --- Default: ".justrun.lua"
   ---@type string
@@ -68,16 +68,39 @@ M.config = {
 
   --- Terminal floating window opts
   ---@type vim.api.keyset.win_config
-  task_terminal_opts = {
+  terminal_opts = {
+    ---@type string
     relative = "editor",
-    col = math.floor((vim.o.columns - vim.api.nvim_win_get_width(0)) / 2),
-    row = math.floor((vim.o.lines - vim.api.nvim_win_get_width(0)) / 2),
-    --- Default: current_window_width * 0.8
-    width = math.floor(vim.api.nvim_win_get_width(0) * 0.8),
-    --- Default: current_window_height * 0.8
-    height = math.floor(vim.api.nvim_win_get_height(0) * 0.8),
+
+    --- Vim ui effects
+    ---@type string
     style = "minimal",
+
+    --- Border style
+    ---@type string
     border = "rounded",
+
+    --- Default: current_window_width * 0.8
+    ---@type integer
+    max_width = math.floor(vim.o.columns * 0.8),
+
+    ---@type integer
+    --- Default: current_window_height * 0.8
+    max_height = math.floor(vim.o.lines * 0.8),
+  },
+
+  dashboard_opts = {
+    width = 40,
+    number = false,
+    refresh_interval = 1000, -- 1s
+    relativenumber = false,
+    cursorline = true,
+    signcolumn = "no",
+    foldcolumn = "0",
+    wrap = false,
+    spell = false,
+    list = false,
+    winfixwidth = true,
   },
 }
 
@@ -85,7 +108,23 @@ M.config = {
 ---@param opts JustConfig? All custom table configs
 ---@return nil
 M.setup = function(opts)
-  M.config = vim.tbl_deep_extend("force", M.config, opts or {})
+  M = vim.tbl_deep_extend("force", M.config, opts or {})
+end
+
+M.get_cleaned_dashboard_opts = function()
+  local dashboard_opts = vim.deepcopy(M.dashboard_opts)
+  dashboard_opts["refresh_interval"] = nil
+  dashboard_opts["width"] = nil
+
+  return dashboard_opts
+end
+
+M.get_cleaned_terminal_opts = function()
+  local terminal_opts = vim.deepcopy(M.terminal_opts)
+  terminal_opts["max_width"] = nil
+  terminal_opts["max_height"] = nil
+
+  return terminal_opts
 end
 
 ---@cast M JustConfig
