@@ -5,6 +5,9 @@ local runner = require "justrun.runner"
 
 local M = {}
 
+---@type integer
+M.namespace = vim.api.nvim_create_namespace "JustRunDashboard"
+
 ---@private Setup plugin highlights
 ---@return nil
 M.setup_highlights = function()
@@ -17,12 +20,9 @@ end
 
 M.setup_highlights()
 
----@type integer
-M.namespace = vim.api.nvim_create_namespace "JustRunDashboard"
-
 ---@private Create a window to the task
 ---@param task_name string Target task name
----@return integer?, string? (buffer, error)
+---@return integer?, string? (buffer, error) Returns a buffer id and error message
 M.create_task_window = function(task_name)
   ---@type JustTaskState?
   local task_state = state.get_task_state(task_name)
@@ -61,7 +61,7 @@ end
 ---@return nil
 M.find = function()
   ---@type string[], string?
-  local commands, err = utils.load_tasks_table()
+  local commands, err = utils.load_tasks()
 
   if err then
     vim.notify(err, vim.log.levels.ERROR)
@@ -124,19 +124,25 @@ end
 -- ====== DASHBOARD ======
 -- =======================
 
----@type integer?
-M.dashboard_buf = nil
-
----@type integer?
-M.dashboard_win = nil
-
----@private
+--- Get the task name under the cursor in dashboard
 ---@return string, string?
 M.get_task_name_under_cursor = function()
-  local cursor_row, _ = vim.api.nvim_win_get_cursor(M.dashboard_win) [[@as integer]]
+  ---@type integer?
+  local buf = state.get_dashboard_buf()
+
+  ---@type integer?
+  local win = state.get_dashboard_win()
+
+  if not buf or not win then
+    return "", "Can not get a task name. The Tasks Dashboard was not opened."
+  end
+
+  local cursor = vim.api.nvim_win_get_cursor(win)
+  ---@type integer
+  local cursor_row = cursor[1]
 
   ---@type string[]
-  local lines = vim.api.nvim_buf_get_lines(M.dashboard_buf, 0, cursor_row, false)
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, cursor_row, false)
 
   for i = #lines, 1, -1 do
     ---@type string
@@ -160,10 +166,14 @@ end
 ---@return nil
 M.set_dashboard_keymaps = function()
   ---@type vim.keymap.set.Opts
-  local opts = { noremap = true, silent = true, buffer = M.dashboard_buf }
+  local opts = { noremap = true, silent = true, buffer = state.get_dashboard_buf() }
 
   -- quit (q)
   vim.keymap.set("n", "q", function()
+    M.toggle_dashboard()
+  end, opts)
+
+  vim.keymap.set("n", "<Esc><Esc>", function()
     M.toggle_dashboard()
   end, opts)
 
@@ -183,72 +193,100 @@ M.set_dashboard_keymaps = function()
 
     M.create_task_window(task_name)
   end, opts)
+
+  -- delete (d)
+  vim.keymap.set("n", "d", function()
+    local task_name, error = M.get_task_name_under_cursor()
+
+    if error then
+      vim.notify(error, vim.log.levels.ERROR)
+      return
+    end
+
+    state.unload_task(task_name)
+    M.render_dashboard()
+  end, opts)
+end
+
+---@param value boolean
+M.set_dashboard_modifiable = function(value)
+  local buf = state.get_dashboard_buf() --[[@as integer]]
+  vim.api.nvim_set_option_value("modifiable", value, { buf = buf })
 end
 
 ---@private Creates a buffer to Task Dashboard buffer if needed
 ---@return string? error Returns a error message if any error occurs
 M.create_dashboard_buf = function()
-  if M.dashboard_win and vim.api.nvim_win_is_valid(M.dashboard_win) then
-    return
+  ---@type integer?
+  local buf = state.get_dashboard_buf()
+
+  if not buf or not vim.api.nvim_buf_is_valid(buf) then
+    state.set_dashboard_buf(vim.api.nvim_create_buf(false, true))
   end
 
-  if not M.dashboard_buf or not vim.api.nvim_buf_is_valid(M.dashboard_buf) then
-    M.dashboard_buf = vim.api.nvim_create_buf(false, true)
-  end
-
-  if M.dashboard_buf == 0 then
+  if state.get_dashboard_buf() == 0 then
     return "Error to create a buffer to the Tasks Dashboard"
+  else
+    M.set_dashboard_keymaps()
+    M.set_dashboard_modifiable(false)
   end
 end
 
----@private Cleanup the dashboard
+--- Cleanup the dashboard
 ---@return nil
 M.cleanup_dashboard_buf = function()
-  vim.api.nvim_buf_set_lines(M.dashboard_buf, 0, -1, false, {})
-  vim.api.nvim_buf_clear_namespace(M.dashboard_buf, M.namespace, 0, -1)
-end
-
----@private
----@param value boolean
----@return nil
-M.set_dashboard_modifiable = function(value)
-  vim.api.nvim_set_option_value("modifiable", value, { buf = M.dashboard_buf })
+  local buf = state.get_dashboard_buf()
+  if buf then
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, {})
+    vim.api.nvim_buf_clear_namespace(buf, M.namespace, 0, -1)
+  end
 end
 
 ---@private Updates the Tasks Dashboard buffer data
+---@return string? error
 M.render_dashboard = function()
   ---@type string?
   local error = M.create_dashboard_buf()
 
-  if error then
+  ---@type integer?
+  local buf = state.get_dashboard_buf()
+
+  if error or not buf then
     return error
   end
 
   M.set_dashboard_modifiable(true)
-  M.clean_up_dashboard_buf()
+  M.cleanup_dashboard_buf()
 
   ---@type table<string>
   local lines = {}
 
   ---@type integer
-  local lines_number = 0
+  local lines_idx = 0
 
   local highlights = {}
 
   ---@type table<string, JustTaskState>
   local tasks_map = state.get_tasks_state_loaded()
 
-  if #tasks_map == 0 then
+  ---@type string[]
+  local tasks_names = vim.tbl_keys(tasks_map)
+  table.sort(tasks_names)
+
+  if #tasks_names == 0 then
     table.insert(lines, "No tasks runing or finished yet.")
     table.insert(highlights, { #lines - 1, "Comment", 0, -1 })
   end
 
-  for task_name, task_state in ipairs(tasks_map) do
+  for _, task_name in ipairs(tasks_names) do
+    ---@type JustTaskState
+    local task_state = tasks_map[task_name]
+
     --- Task name ---
     table.insert(lines, "Task: " .. task_name)
-    table.insert(highlights, { lines_number - 1, "JustRunHeader", 0, 5 })
-    table.insert(highlights, { lines_number - 1, "Special", 6, -1 })
-    lines_number = lines_number + 1
+    table.insert(highlights, { lines_idx, "JustRunHeader", 0, 5 })
+    table.insert(highlights, { lines_idx, "Special", 6, -1 })
+    lines_idx = lines_idx + 1
 
     --- Status ---
     local status_icon = "●"
@@ -262,8 +300,8 @@ M.render_dashboard = function()
     end
 
     table.insert(lines, string.format("Status: %s %s", status_icon, task_state.status))
-    table.insert(highlights, { lines_number, status_hl, 8, -1 })
-    lines_number = lines_number + 1
+    table.insert(highlights, { lines_idx, status_hl, 8, -1 })
+    lines_idx = lines_idx + 1
 
     --- Output (Preview) ---
     ---@type string
@@ -275,7 +313,7 @@ M.render_dashboard = function()
 
       for i = #buf_lines, 1, -1 do
         if buf_lines[i] and buf_lines[i] ~= "" then
-          output_preview = buf_lines[1]
+          output_preview = buf_lines[i]
           break
         end
       end
@@ -284,52 +322,69 @@ M.render_dashboard = function()
     end
 
     -- truncate output
-    if #output_preview > 60 then
-      output_preview = string.sub(output_preview, 1, 57) .. "..."
+    local max_width = config.dashboard_config.width --[[@as integer]]
+
+    if #output_preview > max_width then
+      output_preview = string.sub(output_preview, 1, max_width - 3) .. "..."
     end
 
     table.insert(lines, "Out: " .. output_preview)
-    table.insert(highlights, { lines_number, "Comment", 0, 4 })
-    lines_number = lines_number + 1
+    table.insert(highlights, { lines_idx, "Comment", 0, 4 })
+    lines_idx = lines_idx + 1
 
     --- Separator ---
-    table.insert(lines, string.rep("-", 40))
-    table.insert(highlights, { lines_number, "JustRunSeparator", 0, -1 })
-    lines_number = lines_number + 1
+    table.insert(lines, string.rep("-", config.dashboard_config.width))
+    table.insert(highlights, { lines_idx, "JustRunSeparator", 0, -1 })
+    lines_idx = lines_idx + 1
   end
 
   --- Write in buffer ---
-  vim.api.nvim_buf_set_lines(M.dashboard_buf, 0, lines_number, false, lines)
+  vim.api.nvim_buf_set_lines(buf, 0, lines_idx, false, lines)
 
   for _, hl in pairs(highlights) do
     local line, group, col_start, col_end = unpack(hl)
 
     if col_end == -1 then
-      col_end = #line[line]
+      col_end = #lines[line + 1]
     end
-    vim.api.nvim_buf_set_extmark(M.dashboard_buf, M.namespace, line, col_start, { hl_group = group, col_end = col_end })
+    vim.api.nvim_buf_set_extmark(buf, M.namespace, line, col_start, { hl_group = group, end_col = col_end })
   end
 
   M.set_dashboard_modifiable(false)
 end
 
 M.toggle_dashboard = function()
-  if M.dashboard_win and vim.api.nvim_win_is_valid(M.dashboard_win) then
-    vim.api.nvim_win_close(M.dashboard_win, true)
-    M.dashboard_win = nil
+  ---@type integer?
+  local win = state.get_dashboard_win()
+  if win and vim.api.nvim_win_is_valid(win) then
+    vim.api.nvim_win_close(win, true)
+    state.set_dashboard_win(nil)
     return
   end
 
-  M.set_dashboard_keymaps()
-
   M.render_dashboard()
 
-  ---@type vim.api.keyset.win_config
-  local win_opts = vim.deepcopy(config.dashboard_config)
-  win_opts.title = " JustRun DashBoard "
-  win_opts.title_pos = "center"
+  local buf = state.get_dashboard_buf() --[[@as integer]]
 
-  M.dashboard_win = vim.api.nvim_open_win(M.dashboard_buf, true, win_opts)
+  vim.cmd "topleft vsplit"
+
+  ---@type integer
+  local new_win = vim.api.nvim_get_current_win()
+  state.set_dashboard_win(new_win)
+
+  local width = config.dashboard_config.width --[[@as integer]]
+
+  vim.api.nvim_win_set_buf(new_win, buf)
+  vim.api.nvim_win_set_width(new_win, width)
+  -- set the header
+  vim.api.nvim_set_option_value("winbar", "%=%#JustRunHeader# JustRun Dashboard %*%=", { win = new_win })
+
+  for opt, val in pairs(config.dashboard_config) do
+    if opt ~= "width" then
+      vim.api.nvim_set_option_value(opt, val, { win = new_win })
+    end
+  end
 end
 
+---@cast M JustUi
 return M
