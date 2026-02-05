@@ -20,10 +20,28 @@ end
 
 M.setup_highlights()
 
+--- Set default keymaps to use inner task terminal
+---@param task_name string Target task name
+---@return nil
+M.set_task_terminal_keymaps = function(task_name)
+  ---@type vim.keymap.set.Opts
+  local opts = { noremap = true, silent = true, buffer = state.get_task_buffer(task_name) }
+
+  -- quit (q)
+  vim.keymap.set("n", "q", function()
+    vim.api.nvim_win_close(0, true)
+  end, opts)
+
+  vim.keymap.set("n", "<Esc><Esc>", function()
+    vim.api.nvim_win_close(0, true)
+  end, opts)
+end
+
 ---@private Create a window to the task
 ---@param task_name string Target task name
+---@param enter boolean Automatically enter in terminal if is true.
 ---@return integer?, string? (buffer, error) Returns a buffer id and error message
-M.create_task_window = function(task_name)
+M.create_task_window = function(task_name, enter)
   ---@type JustTaskState?
   local task_state = state.get_task_state(task_name)
 
@@ -46,11 +64,55 @@ M.create_task_window = function(task_name)
   end
   ---@cast buf integer
 
-  win = vim.api.nvim_open_win(buf, false, config.task_terminal_opts)
+  ---@type integer
+  local total_width = vim.o.columns
+  ---@type integer
+  local total_height = vim.o.lines
+
+  ---@type integer
+  local width = math.floor(total_width * 0.8)
+  ---@type integer
+  local height = math.floor(total_height * 0.8)
+
+  ---@type integer
+  local row = math.floor((total_height - height) / 2)
+  ---@type integer
+  local col = math.floor((total_width - width) / 2)
+
+  ---@type integer
+  local dash_width = 0
+
+  ---@type integer?
+  local dash_win = state.get_dashboard_win()
+  if dash_win and vim.api.nvim_win_is_valid(dash_win) then
+    dash_width = vim.api.nvim_win_get_width(dash_win)
+    col = dash_width + 2
+  end
+
+  ---@type integer
+  local available_width = total_width - dash_width
+  width = math.min(available_width - 4, config.task_terminal_opts.max_width)
+
+  height = math.min(height, config.task_terminal_opts.max_height)
+
+  local win_opts = vim.tbl_extend("force", config.task_terminal_opts, {
+    width = width,
+    height = height,
+    row = row,
+    col = col,
+  })
+
+  -- remove custom options
+  win_opts.max_width = nil
+  win_opts.max_height = nil
+
+  win = vim.api.nvim_open_win(buf, enter, win_opts)
 
   if win == 0 then
     return nil, "Error to create a terminal task window by neovim api"
   end
+
+  M.set_task_terminal_keymaps(task_name)
 
   task_state.task_win = win
 
@@ -182,6 +244,19 @@ M.set_dashboard_keymaps = function()
     M.render_dashboard()
   end, opts)
 
+  ---@param task_name string
+  ---@param enter boolean
+  local function toggle_task_terminal(task_name, enter)
+    local task_state = state.get_task_state(task_name)
+
+    if task_state and task_state.task_win and vim.api.nvim_win_is_valid(task_state.task_win) then
+      vim.api.nvim_win_close(task_state.task_win, true)
+      task_state.task_win = nil
+    else
+      M.create_task_window(task_name, enter)
+    end
+  end
+
   -- enter task terminal (<CR>)
   vim.keymap.set("n", "<CR>", function()
     local task_name, error = M.get_task_name_under_cursor()
@@ -191,7 +266,19 @@ M.set_dashboard_keymaps = function()
       return
     end
 
-    M.create_task_window(task_name)
+    toggle_task_terminal(task_name, true)
+  end, opts)
+
+  -- show task terminal (s)
+  vim.keymap.set("n", "s", function()
+    local task_name, error = M.get_task_name_under_cursor()
+
+    if error then
+      vim.notify(error, vim.log.levels.ERROR)
+      return
+    end
+
+    toggle_task_terminal(task_name, false)
   end, opts)
 
   -- delete (d)
