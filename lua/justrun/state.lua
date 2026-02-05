@@ -72,6 +72,8 @@ M.unload_task = function(task_name)
   if task_state.task_buf and vim.api.nvim_buf_is_valid(task_state.task_buf) then
     vim.api.nvim_buf_delete(task_state.task_buf, { force = true })
   end
+
+  M.loaded_tasks[task_name] = nil
 end
 
 ---@param task_name any
