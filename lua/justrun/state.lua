@@ -222,12 +222,24 @@ end
 ---@param force boolean? Create the buffer if does not exists
 ---@return integer?, string? (buffer, error) Terminal task buffer and error
 M.get_task_buffer = function(task_name, force)
+  ---@type JustTaskState?
+  local task_state = M.get_task_state(task_name)
+
+  if not task_state then
+    return nil, "Task state not loaded for: " .. task_name
+  end
+
   ---@type integer?, string?
   local buf, err = nil, nil
-  buf = M.loaded_tasks[task_name].task_buf
+  buf = task_state.task_buf
 
-  if buf == nil and force == true then
+  ---@type boolean
+  local is_valid = buf ~= nil and vim.api.nvim_buf_is_valid(buf)
+
+  if not is_valid and force == true then
     buf, err = M.create_task_buffer(task_name)
+  elseif not is_valid then
+    return nil, "Buffer for task '" .. task_name .. "' is invalid or deleted."
   end
 
   return buf, err

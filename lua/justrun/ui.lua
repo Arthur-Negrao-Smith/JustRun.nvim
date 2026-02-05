@@ -53,7 +53,7 @@ M.create_task_window = function(task_name, enter)
   local win = task_state.task_win
 
   if win and vim.api.nvim_win_is_valid(win) then
-    return nil, "The task already has a window"
+    return nil, "The task already has a window."
   end
 
   ---@type integer?, string?
@@ -183,6 +183,49 @@ M.find = function()
   end)
 end
 
+--- Open a runned/running task terminal
+---@param task_name string Target task to open your terminal.
+---@param enter boolean? Enter automatically in terminal, if true or nil
+M.open_task_terminal = function(task_name, enter)
+  ---@type _, string?
+  local _, error = M.create_task_window(task_name, enter or true)
+
+  if error then
+    vim.notify(error, vim.log.levels.ERROR)
+    return
+  end
+end
+
+--- Close a runned/running task terminal
+---@param task_name string Target task to close your terminal.
+M.close_task_terminal = function(task_name)
+  if not state.is_loaded(task_name) then
+    vim.notify("The task '" .. task_name .. "' was not runned yet.")
+    return
+  end
+
+  ---@type integer?
+  local task_window = state.get_task_window(task_name)
+
+  if not task_window or not vim.api.nvim_win_is_valid(task_window) then
+    vim.notify("The task '" .. task_name .. "' was not open.")
+    return
+  end
+end
+
+--- Close a runned/running task terminal
+---@param task_name string Target task to close your terminal.
+---@param enter boolean? Enter automatically in terminal, if true or nil
+M.toggle_task_terminal = function(task_name, enter)
+  local task_state = state.get_task_state(task_name)
+
+  if task_state and task_state.task_win and vim.api.nvim_win_is_valid(task_state.task_win) then
+    M.close_task_terminal(task_name)
+  else
+    M.open_task_terminal(task_name, enter)
+  end
+end
+
 -- =======================
 -- ====== DASHBOARD ======
 -- =======================
@@ -225,40 +268,24 @@ M.get_task_name_under_cursor = function()
   return "", "No tasks under the cursor."
 end
 
----@private
+---@private Set the default keymaps to interact with dashboard
 ---@return nil
 M.set_dashboard_keymaps = function()
   ---@type vim.keymap.set.Opts
   local opts = { noremap = true, silent = true, buffer = state.get_dashboard_buf() }
 
   -- quit (q)
-  vim.keymap.set("n", "q", function()
-    M.toggle_dashboard()
-  end, opts)
+  vim.keymap.set("n", "q", M.toggle_dashboard, opts)
 
-  vim.keymap.set("n", "<Esc><Esc>", function()
-    M.toggle_dashboard()
-  end, opts)
+  vim.keymap.set("n", "<Esc><Esc>", M.toggle_dashboard, opts)
 
   -- refresh (r)
   vim.keymap.set("n", "r", function()
     M.render_dashboard()
+    vim.notify("Tasks Dashboard was refreshed.", vim.log.levels.INFO)
   end, opts)
 
-  ---@param task_name string
-  ---@param enter boolean
-  local function toggle_task_terminal(task_name, enter)
-    local task_state = state.get_task_state(task_name)
-
-    if task_state and task_state.task_win and vim.api.nvim_win_is_valid(task_state.task_win) then
-      vim.api.nvim_win_close(task_state.task_win, true)
-      task_state.task_win = nil
-    else
-      M.create_task_window(task_name, enter)
-    end
-  end
-
-  -- enter task terminal (<CR>)
+  -- enter/hide task terminal (<CR>)
   vim.keymap.set("n", "<CR>", function()
     local task_name, error = M.get_task_name_under_cursor()
 
@@ -267,10 +294,10 @@ M.set_dashboard_keymaps = function()
       return
     end
 
-    toggle_task_terminal(task_name, true)
+    M.toggle_task_terminal(task_name, true)
   end, opts)
 
-  -- show task terminal (s)
+  -- show/hide task terminal (s)
   vim.keymap.set("n", "s", function()
     local task_name, error = M.get_task_name_under_cursor()
 
@@ -279,7 +306,7 @@ M.set_dashboard_keymaps = function()
       return
     end
 
-    toggle_task_terminal(task_name, false)
+    M.toggle_task_terminal(task_name, false)
   end, opts)
 
   -- delete (d)
@@ -293,6 +320,7 @@ M.set_dashboard_keymaps = function()
 
     state.unload_task(task_name)
     M.render_dashboard()
+    vim.notify("The task '" .. task_name .. "' was unloaded.", vim.log.levels.INFO)
   end, opts)
 end
 
