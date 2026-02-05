@@ -1,5 +1,3 @@
-local config = require "justrun.config"
-
 local JustTaskState = {}
 
 JustTaskState.__index = JustTaskState
@@ -76,6 +74,16 @@ M.unload_task = function(task_name)
   end
 end
 
+---@param task_name any
+---@return boolean
+M.is_loaded = function(task_name)
+  if M.loaded_tasks[task_name] then
+    return true
+  end
+
+  return false
+end
+
 --- Change the state of a task to running
 ---@param task_name string Name of the task to run
 ---@param task string | string[] | JustTask
@@ -101,8 +109,8 @@ M.get_running_tasks = function()
   local running_tasks = {}
 
   ---@type string, JustTaskState
-  for task_name, task in ipairs(M.loaded_tasks) do
-    if task.is_running then
+  for task_name, task in pairs(M.loaded_tasks) do
+    if M.is_running(task_name) then
       running_tasks[task_name] = task
     end
   end
@@ -117,8 +125,8 @@ M.get_finished_tasks = function()
   local finished_tasks = {}
 
   ---@type string, JustTaskState
-  for task_name, task in ipairs(M.loaded_tasks) do
-    if not task.is_active then
+  for task_name, task in pairs(M.loaded_tasks) do
+    if not M.is_running(task_name) then
       finished_tasks[task_name] = task
     end
   end
@@ -138,6 +146,19 @@ end
 ---@return string | string[] | JustTask task Loaded task
 M.get_loaded_task = function(task_name)
   return M.loaded_tasks[task_name].task
+end
+
+--- Get a loaded task state
+---@param task_name string Target task name
+---@return JustTaskState? task_state Loaded task state. Returns nil if the task state does not loaded.
+M.get_task_state = function(task_name)
+  return M.loaded_tasks[task_name]
+end
+
+--- Get all status tasks loaded
+---@return table<string, JustTaskState>
+M.get_tasks_state_loaded = function()
+  return M.loaded_tasks
 end
 
 ---@private Create a buffer to the task
@@ -162,34 +183,6 @@ M.create_task_buffer = function(task_name)
   return buf, nil
 end
 
----@private Create a window to the task
----@param task_name string Target task name
----@return integer?, string? (buffer, error)
-M.create_task_window = function(task_name)
-  local task_state = M.loaded_tasks[task_name]
-
-  ---@type integer?
-  local win
-
-  ---@type integer?, string?
-  local buf, error = M.get_task_buffer(task_name, true)
-
-  if error then
-    return nil, error
-  end
-  ---@cast buf integer
-
-  win = vim.api.nvim_open_win(buf, false, config.task_terminal_opts)
-
-  if win == 0 then
-    return nil, "Error to create a terminal task window by neovim api"
-  end
-
-  task_state.task_win = win
-
-  return win, nil
-end
-
 --- Get the terminal task buffer
 ---@param task_name string Target task name
 ---@param force boolean? Create the buffer if does not exists
@@ -206,20 +199,37 @@ M.get_task_buffer = function(task_name, force)
   return buf, err
 end
 
---- Get the terminal task window
----@param task_name string Target task name
----@param force boolean? Create the window if does not exists
----@return integer?, string? (window, error) Terminal task window and error
-M.get_task_window = function(task_name, force)
-  ---@type integer?, string?
-  local win, err = nil, nil
-  win = M.loaded_tasks[task_name].task_win
+--- Get the terminal task window.
+---@param task_name string Target task name.
+---@return integer? window Terminal task window.
+M.get_task_window = function(task_name)
+  return M.loaded_tasks[task_name].task_win
+end
 
-  if win == nil and force == true then
-    win, err = M.create_task_window(task_name)
-  end
+--- Get the tasks dashboard buffer
+---@return integer?
+M.get_dashboard_buf = function()
+  return M.dashboard_buf
+end
 
-  return win, err
+--- Get the tasks dashboard window
+---@return integer?
+M.get_dashboard_win = function()
+  return M.dashboard_win
+end
+
+-- Set the tasks dashboard buffer.
+---@param buf integer? The new tasks dashboard buffer value.
+---@return nil
+M.set_dashboard_buf = function(buf)
+  M.dashboard_buf = buf
+end
+
+-- Set the tasks dashboard window.
+---@param win integer? The new tasks dashboard window value.
+---@return nil
+M.set_dashboard_win = function(win)
+  M.dashboard_win = win
 end
 
 ---@cast M JustState
