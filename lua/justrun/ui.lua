@@ -402,6 +402,18 @@ M.render_dashboard = function()
   M.set_dashboard_modifiable(true)
   M.cleanup_dashboard_buf()
 
+  --- Dynamic size
+  ---@type integer?
+  local win_width = nil
+
+  ---@type integer?
+  local dash_win = state.get_dashboard_win()
+  if dash_win and vim.api.nvim_win_is_valid(dash_win) then
+    win_width = vim.api.nvim_win_get_width(dash_win)
+  end
+
+  local max_width = win_width or config.dashboard_config.width --[[@as integer]]
+
   ---@type table<string>
   local lines = {}
 
@@ -427,7 +439,12 @@ M.render_dashboard = function()
     local task_state = tasks_map[task_name]
 
     --- Task name ---
-    table.insert(lines, "Task: " .. task_name)
+    ---@type string
+    local truncated_task_name = "Task: " .. task_name
+    if #task_name > max_width then
+      truncated_task_name = string.sub(truncated_task_name, 1, max_width - 3) .. "..."
+    end
+    table.insert(lines, truncated_task_name)
     table.insert(highlights, { lines_idx, "JustRunHeader", 0, 5 })
     table.insert(highlights, { lines_idx, "Special", 6, -1 })
     lines_idx = lines_idx + 1
@@ -466,18 +483,17 @@ M.render_dashboard = function()
     end
 
     -- truncate output
-    local max_width = config.dashboard_config.width --[[@as integer]]
-
+    output_preview = "Out: " .. output_preview
     if #output_preview > max_width then
       output_preview = string.sub(output_preview, 1, max_width - 3) .. "..."
     end
 
-    table.insert(lines, "Out: " .. output_preview)
+    table.insert(lines, output_preview)
     table.insert(highlights, { lines_idx, "Comment", 0, 4 })
     lines_idx = lines_idx + 1
 
     --- Separator ---
-    table.insert(lines, string.rep("-", config.dashboard_config.width))
+    table.insert(lines, string.rep("-", max_width))
     table.insert(highlights, { lines_idx, "JustRunSeparator", 0, -1 })
     lines_idx = lines_idx + 1
   end
