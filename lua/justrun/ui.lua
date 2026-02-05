@@ -177,6 +177,7 @@ M.find = function()
 
     if choice then
       runner.run(choice)
+      M.render_dashboard()
       return
     end
   end)
