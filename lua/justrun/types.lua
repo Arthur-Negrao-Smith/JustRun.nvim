@@ -26,7 +26,7 @@
 -- ======= RUNTIME STATE ======
 -- ============================
 
---- Represents a resulta/status of a runtime task instance.
+--- Represents a result/status of a runtime task instance.
 ---@alias JustTaskStatus "success" | "fail" | "running"
 
 ---@class JustState JustRun plugin global state
@@ -35,6 +35,7 @@
 ---
 ---@field private dashboard_buf integer? Buffer of the dashboard.
 ---@field private dashboard_win integer? Window of the dashboard.
+---@field private dashboard_timer userdata? Timer to periodically update dashboard.
 ---@field last_task string? Last task executed.
 ---@field private loaded_tasks table<string, JustTaskState> All loaded tasks.
 ---
@@ -44,7 +45,7 @@
 ---@field is_loaded fun(task_name: string): boolean Checks if a task is loaded.
 ---@field private load_task fun(task_name: string, task: JustRunnable) Loads a task into memory (Internal).
 ---@field unload_task fun(task_name: string) Removes task from memory and clears associated buffers.
----@field active_task fun(task_name: string, task: JustRunnable) Loads a task and sets its status to 'running'.
+---@field active_task fun(task_name: string, task: JustRunnable) Loads/Reloads a task and sets its status to 'running'.
 ---@field finish_task fun(task_name: string, status: JustTaskStatus) Updates the task status to finished (success/fail).
 ---
 --- GETTERS
@@ -59,11 +60,13 @@
 ---@field get_task_win fun(task_name: string, force: boolean?): (integer?, string?) Safe wrapper to get the task window ID.
 ---@field get_dashboard_buf fun(): integer? Returns the tasks dashboard buffer id.
 ---@field get_dashboard_win fun(): integer? Returns the tasks dashboard window id.
+---@field get_dashboard_timer fun(): userdata? Returns the dashboard timer.
 ---
 --- SETTERS
 ---
 --- @field set_dashboard_buf fun(buf: integer?): nil Set the tasks dashboard buffer.
 --- @field set_dashboard_win fun(win: integer?): nil Set the tasks dashboard window.
+--- @field set_dashboard_timer fun(timer: userdata): nil Set the dashboard timer.
 ---
 --- UI & BUFFER METHODS
 ---
@@ -85,6 +88,8 @@
 ---@field run_last fun(): nil Run the last task executed.
 ---@field run_file fun(filename: string?): nil Run a file by filetype.
 ---@field run_under_cursor fun(): nil Run a task under the cursor.
+---@field private handle_task fun(task_data: JustRunnable, all_tasks: JustTasksTable, depth: integer): (string, string?) Recursively resolves command string.
+---@field private start_job fun(cmd: string, task: JustTask, task_name: string, should_exit: boolean, buf: integer): nil Starts the job.
 
 -- ============================
 -- =========== UI =============
@@ -99,7 +104,7 @@
 ---
 --- TASK WINDOW
 ---
----@field create_task_window fun(task_name: string): (integer?, string?) Opens a floating window for a specific task's buffer. Returns window ID or error.
+---@field create_task_win fun(task_name: string): (integer?, string?) Opens a floating window for a specific task's buffer. Returns window ID or error.
 ---
 --- SELECTION MENU
 ---
@@ -116,8 +121,42 @@
 ---@field toggle_dashboard fun(): nil Toggles the visibility of the dashboard window (opens or closes).
 
 -- ============================
+-- ======= UTILS =============
+-- ============================
+
+---@class JustUtils Helper functions and system utilities.
+---@field get_sep fun(): string Get the default separator (e.g. " && ").
+---@field concat_with_sep fun(t: string[], sep: string?): string Join a list of strings with the separator.
+---@field is_windows boolean True if running on Windows.
+---@field is_powershell fun(): boolean True if the shell is PowerShell/pwsh.
+---@field replace_placeholders fun(cmd: string): string Replaces ${file}, ${cwd}, etc.
+---@field process_cmd fun(cmd: string): string Wrapper to process a command string.
+---@field load_tasks fun(): (JustTasksTable, string?) Load tasks from the config file.
+---@field ANSI_COLORS table<string, string> ANSI escape codes for terminal colors.
+
+-- ============================
 -- ====== CONFIGURATION =======
 -- ============================
+
+---@class JustTerminalOpts : vim.api.keyset.win_config
+---@field max_width integer? Maximum width limit for the floating window. Default: 80% of screen.
+---@field max_height integer? Maximum height limit for the floating window. Default: 80% of screen.
+
+---@class JustDashboardOpts
+---PLUGIN SPECIFIC
+---@field width integer? Width of the dashboard window. Default: 40.
+---@field refresh_interval integer? Auto-refresh interval in ms. Default: 1000.
+---
+---WINDOW OPTIONS (vim.opt_local)
+---@field number boolean? Show line numbers. Default: false.
+---@field relativenumber boolean? Show relative line numbers. Default: false.
+---@field cursorline boolean? Highlight the screen line of the cursor. Default: true.
+---@field signcolumn string? Show sign column ("auto", "no", "yes"). Default: "no".
+---@field foldcolumn string? Show fold column. Default: "0".
+---@field wrap boolean? Wrap long lines. Default: false.
+---@field spell boolean? Enable spell checking. Default: false.
+---@field list boolean? Show hidden characters. Default: false.
+---@field winfixwidth boolean? Keep window width when resizing others. Default: true.
 
 ---@class JustConfig JustRun custom table configs.
 ---@field filename string? Default file to load task definitions. Default: .justrun.lua.
@@ -126,13 +165,32 @@
 ---@field default_task string? Task to run when :JustRun is used without arguments. Default: "default".
 ---@field cwd string? Default woriking directory. This option can be overridden by the "cwd" field in task definition. Default: ".".
 ---@field force_run boolean? If arguments are missing, run default task, if is not found, run the first available task. Default: false.
----@field split_direction "vertical" | "horizontal" | nil Orientation of the terminal split
 ---@field exit_on_success boolean? Close the terminal if the task succeeds. This option can be overwritten in the task body. Default: false.
 ---@field default_sep string? Default separator to join tasks commands. This option can be overwritten in the task body. Default: "&&".
 ---@field max_depth integer? Maximum recursion depth for nested tasks to prevent infinity loops. Use -1 to disable the limit (caution). Default: 20.
----@field task_terminal_opts vim.api.keyset.win_config Configs to the floating terminal.
----@field dashboard_config vim.api.keyset.win_config Configs to tasks dashboard.
+---@field terminal_opts vim.api.keyset.win_config Task floating terminals options.
+---@field dashboard_opts JustDashboardOpts Tasks dashboard options.
 ---
 --- Methods
 ---
----@field setup fun(opts: JustConfig?): nil Default plugin setup function
+---@field setup fun(opts: JustConfig?): nil Default plugin setup function.
+---@field get_cleaned_dashboard_opts fun(): table Get the cleaned dashboard options.
+---@field get_cleaned_terminal_opts fun(): vim.api.keyset.win_config Get the cleaned task terminal options.
+
+-- ============================
+-- ===== MAIN MODULE (API) ====
+-- ============================
+
+---@class JustRun Public API for the plugin.
+---@field setup fun(opts: JustConfig?): nil Setup the plugin.
+---@field load_tasks fun(): (JustTasksTable, string?) Load tasks helper.
+---@field run fun(task_name: string?): nil Run a task.
+---@field run_file fun(filename: string?): nil Run a file based on filetype.
+---@field run_last fun(): nil Re-run the last task.
+---@field run_under_cursor fun(): nil Run the task defined under cursor in config file.
+---@field toggle_dashboard fun(): nil Open/Close the dashboard.
+---@field find fun(): nil Open the task selector.
+---@field open_task_terminal fun(task_name: string, enter: boolean?, force: boolean?): nil Open task terminal.
+---@field close_task_terminal fun(task_name: string): nil Close task terminal.
+---@field toggle_task_terminal fun(task_name: string, enter: boolean?, force: boolean?): nil Toggle task terminal.
+---@field create_tasks fun(tasks: JustTasksTable): JustTasksTable Helper for autocompletion.

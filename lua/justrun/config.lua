@@ -38,16 +38,6 @@ M = {
   ---@type boolean
   force_run = false,
 
-  --- Orientation of the terminal split.
-  --- Default: "vertical"
-  ---@type "vertical" | "horizontal"
-  split_direction = "vertical",
-
-  --- Size of the terminal split.
-  --- Default: 50
-  ---@type integer
-  split_size = 50,
-
   --- Close the terminal if the task succeeds. This option can be
   --- overridden by 'exit_on_success' in the task definition.
   --- Default: false
@@ -66,8 +56,8 @@ M = {
   ---@type integer
   max_depth = 20,
 
-  --- Terminal floating window opts
-  ---@type vim.api.keyset.win_config
+  --- Terminal floating window options
+  ---@type JustTerminalOpts
   terminal_opts = {
     ---@type string
     relative = "editor",
@@ -89,6 +79,8 @@ M = {
     max_height = math.floor(vim.o.lines * 0.8),
   },
 
+  --- Tasks Dashboard options
+  ---@type JustDashboardOpts
   dashboard_opts = {
     width = 40,
     number = false,
@@ -111,15 +103,21 @@ M.setup = function(opts)
   M = vim.tbl_deep_extend("force", M.config, opts or {})
 end
 
+--- Get dashboard opts without "refresh_interval" and "width" fields.
+---@return vim.api.keyset.win_config
 M.get_cleaned_dashboard_opts = function()
+  ---@type JustDashboardOpts
   local dashboard_opts = vim.deepcopy(M.dashboard_opts)
   dashboard_opts["refresh_interval"] = nil
   dashboard_opts["width"] = nil
 
-  return dashboard_opts
+  return dashboard_opts --[[@as vim.api.keyset.win_config]]
 end
 
+--- Get terminal opts without "max_width" and "max_height" fields.
+---@return JustTerminalOpts
 M.get_cleaned_terminal_opts = function()
+  ---@type JustTerminalOpts
   local terminal_opts = vim.deepcopy(M.terminal_opts)
   terminal_opts["max_width"] = nil
   terminal_opts["max_height"] = nil

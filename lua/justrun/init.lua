@@ -31,4 +31,5 @@ M.create_tasks = function(tasks)
   return tasks
 end
 
+---@cast M JustRun
 return M

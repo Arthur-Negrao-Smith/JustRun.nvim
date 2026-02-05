@@ -119,4 +119,5 @@ M.ANSI_COLORS = {
   DARK_GREY = [=[\e[90m]=],
 }
 
+---@cast M JustUtils
 return M
