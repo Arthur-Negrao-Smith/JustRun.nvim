@@ -107,7 +107,6 @@ end
 ---@param should_exit boolean Close the terminal automatically when the job finish if true
 ---@param buf integer Buffer id
 M.start_job = function(cmd, task, task_name, should_exit, buf)
-  state.active_task(task_name, task)
   vim.notify("Running task: " .. task_name, vim.log.levels.INFO)
 
   local job_opts = {
@@ -115,8 +114,15 @@ M.start_job = function(cmd, task, task_name, should_exit, buf)
     cwd = task.cwd or config.cwd,
 
     on_exit = function(job_id, exit_code, event)
+      ---@type JustTaskStatus
+      local status = "success"
+      if exit_code ~= 0 then
+        status = "fail"
+      end
+
+      state.finish_task(task_name, status)
+
       if should_exit and exit_code == 0 then
-        state.finish_task(task_name, "success")
         ---@integer?, string?
         local win, err = state.get_task_window(task_name)
 
@@ -135,10 +141,6 @@ M.start_job = function(cmd, task, task_name, should_exit, buf)
   vim.api.nvim_buf_call(buf, function()
     vim.fn.jobstart(cmd, job_opts)
   end)
-
-  vim.api.nvim_buf_call(buf, function()
-    vim.cmd "startinsert" -- enter insert mode in terminal to autoscroll
-  end)
 end
 
 --- Run a  specific task or the default one
@@ -146,7 +148,7 @@ end
 ---@return nil
 M.run = function(task_name)
   ---@type JustTasksTable, string?
-  local tasks_table, err = utils.load_tasks_table()
+  local tasks_table, err = utils.load_tasks()
 
   ---@type boolean
   local is_filetype = (task_name ~= nil and config.filetype[task_name] ~= nil)
@@ -211,6 +213,7 @@ M.run = function(task_name)
   ---@type integer?
   local buf = nil
 
+  state.active_task(target_task_name, task_to_run)
   buf, err = state.get_task_buffer(target_task_name, true)
 
   if err then
@@ -292,7 +295,7 @@ end
 ---@return nil
 M.run_file = function(filename)
   ---@type JustTasksTable
-  local tasks, _ = utils.load_tasks_table()
+  local tasks, _ = utils.load_tasks()
 
   if filename then
     ---@type string?
