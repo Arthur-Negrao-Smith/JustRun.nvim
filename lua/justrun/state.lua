@@ -84,14 +84,22 @@ M.is_loaded = function(task_name)
   return false
 end
 
---- Change the state of a task to running
+--- Change the state of a task to running and create a new buffer to the task.
 ---@param task_name string Name of the task to run
 ---@param task string | string[] | JustTask
 ---@return nil
 M.active_task = function(task_name, task)
   M.load_task(task_name, task)
 
-  M.loaded_tasks[task_name].status = "running"
+  local _, error = M.reset_task_buffer(task_name)
+
+  if error then
+    vim.notify(error, vim.log.levels.ERROR)
+    return
+  end
+
+  local task_state = M.get_task_state(task_name) --[[@as JustTaskState]]
+  task_state.status = "running"
 end
 
 --- Change a State of a task to a finished state: success or fail
@@ -181,6 +189,30 @@ M.create_task_buffer = function(task_name)
   task_state.task_buf = buf
 
   return buf, nil
+end
+
+---@private Reset the task buffer
+---@param task_name string
+---@return string?
+M.reset_task_buffer = function(task_name)
+  local task_state = M.get_task_state(task_name)
+
+  if not task_state then
+    return "The task '" .. task_name .. "' is loaded."
+  end
+
+  ---@type integer?
+  local buf = task_state.task_buf
+
+  if buf and vim.api.nvim_buf_is_valid(buf) then
+    vim.api.nvim_buf_delete(buf, { force = true })
+  end
+
+  local _, error = M.create_task_buffer(task_name)
+
+  if error then
+    return error
+  end
 end
 
 --- Get the terminal task buffer
