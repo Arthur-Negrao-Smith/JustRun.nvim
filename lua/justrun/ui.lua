@@ -11,14 +11,12 @@ M.namespace = vim.api.nvim_create_namespace "JustRunDashboard"
 ---@private Setup plugin highlights
 ---@return nil
 M.setup_highlights = function()
-  vim.api.nvim_set_hl(M.namespace, "JustRunHeader", { link = "Title", default = true })
-  vim.api.nvim_set_hl(M.namespace, "JustRunSuccess", { link = "String", default = true })
-  vim.api.nvim_set_hl(M.namespace, "JustRunFail", { link = "Error", default = true })
-  vim.api.nvim_set_hl(M.namespace, "JustRunRunning", { link = "WarningMsg", default = true })
-  vim.api.nvim_set_hl(M.namespace, "JustRunSeparator", { link = "Comment", default = true })
+  vim.api.nvim_set_hl(0, "JustRunHeader", { link = "Title", default = true })
+  vim.api.nvim_set_hl(0, "JustRunSuccess", { link = "String", default = true })
+  vim.api.nvim_set_hl(0, "JustRunFail", { link = "ErrorMsg", default = true })
+  vim.api.nvim_set_hl(0, "JustRunRunning", { link = "Function", default = true })
+  vim.api.nvim_set_hl(0, "JustRunSeparator", { link = "Comment", default = true })
 end
-
-M.setup_highlights()
 
 --- Set default keymaps to use inner task terminal
 ---@param task_name string Target task name
@@ -440,6 +438,8 @@ M.render_dashboard = function()
     return error
   end
 
+  M.setup_highlights()
+
   --- Dynamic size
   ---@type integer?
   local win_width = nil
@@ -486,7 +486,7 @@ M.render_dashboard = function()
     --- Task name ---
     ---@type string
     local truncated_task_name = "Task: " .. task_name
-    if #task_name > max_width then
+    if #truncated_task_name > max_width then
       truncated_task_name = string.sub(truncated_task_name, 1, max_width - 3) .. "..."
     end
     table.insert(lines, truncated_task_name)
