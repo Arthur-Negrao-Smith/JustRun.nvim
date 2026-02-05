@@ -2,6 +2,7 @@ if not pcall(require, "justrun") then
   return
 end
 
+---@type JustRun
 local justrun = require "justrun"
 
 ---@param ArgLead string
