@@ -10,13 +10,14 @@ M = {
   --- used without arguments
   ---@type JustTasksTable
   filetype = {
-    lua = { cmd = "lua ${file}", desc = "Run current lua file" },
-    python = { cmd = "python ${file}", desc = "Run current python file" },
-    javascript = { cmd = "node ${file}", desc = "Run current javascript file" },
+    lua = { cmd = "lua ${file}", desc = "Run the current lua file" },
+    python = { cmd = "python ${file}", desc = "Run the current python file" },
+    javascript = { cmd = "node ${file}", desc = "Run the current javascript file" },
+    c = { cmd = "gcc ${file} -o ${fileNoExtension}", desc = "Run the current C file" },
+    cpp = { cmd = "g++ ${file} -o ${fileNoExtension}", desc = "Run the current C++ file" },
   },
 
-  -- TODO: implement show_filetype_tasks
-  --- Show the others filetype taks in :JustRunFind. Show only the current
+  --- Show the others filetype tasks in :JustRunFind. Show only the current
   --- filetype task if false. Default: false
   ---@type boolean
   show_filetype_tasks = false,

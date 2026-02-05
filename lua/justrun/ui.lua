@@ -125,16 +125,63 @@ end
 --- Open a UI menu to select/find a task
 ---@return nil
 M.find = function()
-  ---@type string[], string?
-  local commands, err = utils.load_tasks()
+  ---@type JustTasksTable, string?
+  local commands, error = utils.load_tasks()
 
-  if err then
-    vim.notify(err, vim.log.levels.ERROR)
+  if error and config.show_filetype_tasks then
+    vim.notify(error, vim.log.levels.WARN)
     return
+  elseif error then
+    vim.notify(error, vim.log.levels.ERROR)
   end
 
+  -- ======================
+  --    FILETYPE FILTER
+  -- ======================
+  ---@type boolean
+  local show_others = config.show_filetype_tasks
+
+  ---@type string
+  local current_ft = vim.bo.filetype
+
+  if config.filetype then
+    for filetype, task in pairs(config.filetype) do
+      -- current filetype aways is showed
+      local is_current = (filetype == current_ft)
+
+      if is_current or show_others then
+        -- local tasks have high priority
+        if not commands[filetype] then
+          commands[filetype] = task
+        end
+      end
+    end
+  end
+
+  -- ======================
+  --      SHOW RESULTS
+  -- ======================
   local task_keys = vim.tbl_keys(commands)
-  table.sort(task_keys)
+  table.sort(task_keys, function(a, b)
+    -- default task has the highest priority
+    if a == config.default_task then
+      return true
+    end
+    if b == config.default_task then
+      return false
+    end
+
+    -- the current filetype task the second highest priority
+    if a == current_ft then
+      return true
+    end
+    if b == current_ft then
+      return false
+    end
+
+    -- order by alphabetical order
+    return a < b
+  end)
   table.insert(task_keys, "Exit Menu")
 
   ---@type string
