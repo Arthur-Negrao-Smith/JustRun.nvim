@@ -40,7 +40,7 @@ end
 ---@param enter boolean Automatically enter in terminal if is true.
 ---@param force boolean? Create a buffer if not exists. Will force if nil.
 ---@return integer?, string? (buffer, error) Returns a buffer id and error message
-M.create_task_window = function(task_name, enter, force)
+M.create_task_win = function(task_name, enter, force)
   if force == nil then
     force = true
   end
@@ -196,7 +196,7 @@ M.open_task_terminal = function(task_name, enter, force)
   end
 
   ---@type _, string?
-  local _, error = M.create_task_window(task_name, enter, force)
+  local _, error = M.create_task_win(task_name, enter, force)
 
   if error then
     vim.notify(error, vim.log.levels.ERROR)
