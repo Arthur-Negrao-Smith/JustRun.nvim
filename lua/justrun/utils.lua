@@ -82,7 +82,7 @@ end
 --- Load all tasks like a table from the configuration file
 ---@return JustTasksTable commands Table with runnable tasks. Return a empty table is error occurs
 ---@return string? err Error message
-M.load_tasks_table = function()
+M.load_tasks = function()
   ---@type string
   local workdir = vim.fn.getcwd()
 
