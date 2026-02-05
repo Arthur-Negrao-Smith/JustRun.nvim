@@ -93,7 +93,7 @@ end
 M.active_task = function(task_name, task)
   M.load_task(task_name, task)
 
-  local _, error = M.reset_task_buffer(task_name)
+  local _, error = M.reset_task_buf(task_name)
 
   if error then
     vim.notify(error, vim.log.levels.ERROR)
@@ -174,7 +174,7 @@ end
 ---@private Create a buffer to the task
 ---@param task_name string Target task name
 ---@return integer?, string? (buffer, error)
-M.create_task_buffer = function(task_name)
+M.create_task_buf = function(task_name)
   ---@type JustTaskState
   local task_state = M.loaded_tasks[task_name]
 
@@ -196,7 +196,7 @@ end
 ---@private Reset the task buffer
 ---@param task_name string
 ---@return string?
-M.reset_task_buffer = function(task_name)
+M.reset_task_buf = function(task_name)
   local task_state = M.get_task_state(task_name)
 
   if not task_state then
@@ -210,7 +210,7 @@ M.reset_task_buffer = function(task_name)
     vim.api.nvim_buf_delete(buf, { force = true })
   end
 
-  local _, error = M.create_task_buffer(task_name)
+  local _, error = M.create_task_buf(task_name)
 
   if error then
     return error
@@ -221,7 +221,7 @@ end
 ---@param task_name string Target task name
 ---@param force boolean? Create the buffer if does not exists
 ---@return integer?, string? (buffer, error) Terminal task buffer and error
-M.get_task_buffer = function(task_name, force)
+M.get_task_buf = function(task_name, force)
   ---@type JustTaskState?
   local task_state = M.get_task_state(task_name)
 
@@ -237,7 +237,7 @@ M.get_task_buffer = function(task_name, force)
   local is_valid = buf ~= nil and vim.api.nvim_buf_is_valid(buf)
 
   if not is_valid and force == true then
-    buf, err = M.create_task_buffer(task_name)
+    buf, err = M.create_task_buf(task_name)
   elseif not is_valid then
     return nil, "Buffer for task '" .. task_name .. "' is invalid or deleted."
   end
@@ -248,7 +248,7 @@ end
 --- Get the terminal task window.
 ---@param task_name string Target task name.
 ---@return integer? window Terminal task window.
-M.get_task_window = function(task_name)
+M.get_task_win = function(task_name)
   return M.loaded_tasks[task_name].task_win
 end
 

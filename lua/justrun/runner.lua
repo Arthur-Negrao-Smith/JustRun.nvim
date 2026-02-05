@@ -124,7 +124,7 @@ M.start_job = function(cmd, task, task_name, should_exit, buf)
 
       if should_exit and exit_code == 0 then
         ---@integer?, string?
-        local win, err = state.get_task_window(task_name)
+        local win, err = state.get_task_win(task_name)
 
         if err then
           vim.notify(err, vim.log.levels.ERROR)
@@ -214,7 +214,7 @@ M.run = function(task_name)
   local buf = nil
 
   state.active_task(target_task_name, task_to_run)
-  buf, err = state.get_task_buffer(target_task_name, true)
+  buf, err = state.get_task_buf(target_task_name, true)
 
   if err then
     vim.notify(err, vim.log.levels.ERROR)

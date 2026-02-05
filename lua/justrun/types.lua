@@ -41,7 +41,8 @@
 --- STATE MANAGEMENT METHODS
 ---
 ---@field is_running fun(task_name: string): boolean Checks if a task is currently running.
----@field load_task fun(task_name: string, task: JustRunnable) Loads a task into memory (Internal).
+---@field is_loaded fun(task_name: string): boolean Checks if a task is loaded.
+---@field private load_task fun(task_name: string, task: JustRunnable) Loads a task into memory (Internal).
 ---@field unload_task fun(task_name: string) Removes task from memory and clears associated buffers.
 ---@field active_task fun(task_name: string, task: JustRunnable) Loads a task and sets its status to 'running'.
 ---@field finish_task fun(task_name: string, status: JustTaskStatus) Updates the task status to finished (success/fail).
@@ -52,13 +53,22 @@
 ---@field get_finished_tasks fun(): table<string, JustTaskState> Returns a table of all finished tasks (inactive).
 ---@field get_task_status fun(task_name: string): JustTaskStatus Returns the current status of a specific task.
 ---@field get_loaded_task fun(task_name: string): JustRunnable Returns the raw definition of a loaded task.
+---@field get_task_state fun(task_name: string): JustTaskState? Returns the current loaded task state. Returns nil if the task state does not loaded.
+---@field get_tasks_state_loaded fun(): table<string, JustTaskState> Get all status tasks loaded.
+---@field get_task_buf fun(task_name: string, force: boolean?): (integer?, string?) Safe wrapper to get the task buffer ID.
+---@field get_task_win fun(task_name: string, force: boolean?): (integer?, string?) Safe wrapper to get the task window ID.
+---@field get_dashboard_buf fun(): integer? Returns the tasks dashboard buffer id.
+---@field get_dashboard_win fun(): integer? Returns the tasks dashboard window id.
+---
+--- SETTERS
+---
+--- @field set_dashboard_buf fun(buf: integer?): nil Set the tasks dashboard buffer.
+--- @field set_dashboard_win fun(win: integer?): nil Set the tasks dashboard window.
 ---
 --- UI & BUFFER METHODS
 ---
----@field private create_task_buffer fun(task_name: string): (integer?, string?) Creates or retrieves the task buffer (Internal).
----@field private create_task_window fun(task_name: string): (integer?, string?) Creates or retrieves the task window (Internal).
----@field get_task_buffer fun(task_name: string, force: boolean?): (integer?, string?) Safe wrapper to get the task buffer ID.
----@field get_task_window fun(task_name: string, force: boolean?): (integer?, string?) Safe wrapper to get the task window ID.
+---@field private create_task_buf fun(task_name: string): (integer?, string?) Creates or retrieves the task buffer (Internal).
+---@field private create_task_win fun(task_name: string): (integer?, string?) Creates or retrieves the task window (Internal).
 
 ---@class JustTaskState Tracks the runtime execution state of a task instance.
 ---@field task JustRunnable The a runnable task to execute.
@@ -77,6 +87,35 @@
 ---@field run_under_cursor fun(): nil Run a task under the cursor.
 
 -- ============================
+-- =========== UI =============
+-- ============================
+
+---@class JustUi UI components and Dashboard management.
+---@field namespace integer The namespace used for highlighting dashboard components.
+---
+--- HIGHLIGHTS & SETUP
+---
+---@field private setup_highlights fun(): nil Sets up the highlight groups for the UI (Header, Success, Fail, etc.).
+---
+--- TASK WINDOW
+---
+---@field create_task_window fun(task_name: string): (integer?, string?) Opens a floating window for a specific task's buffer. Returns window ID or error.
+---
+--- SELECTION MENU
+---
+---@field find fun(): nil Opens a `vim.ui.select` menu to pick and run tasks.
+---
+--- DASHBOARD METHODS
+---
+---@field get_task_name_under_cursor fun(): (string, string?) Retrieves the task name based on the cursor position in the dashboard.
+---@field private set_dashboard_keymaps fun(): nil Sets the keymaps (q, r, <CR>) for the dashboard buffer.
+---@field private create_dashboard_buf fun(): string? Creates the dashboard buffer if it doesn't exist. Returns an error message if it fails.
+---@field cleanup_dashboard_buf fun(): nil Clears content and highlights from the dashboard buffer.
+---@field private set_dashboard_modifiable fun(value: boolean): nil Toggles the 'modifiable' option of the dashboard buffer.
+---@field render_dashboard fun(): string? Re-renders the dashboard content (tasks, status, output). Returns an error if buffer creation fails.
+---@field toggle_dashboard fun(): nil Toggles the visibility of the dashboard window (opens or closes).
+
+-- ============================
 -- ====== CONFIGURATION =======
 -- ============================
 
@@ -92,4 +131,8 @@
 ---@field default_sep string? Default separator to join tasks commands. This option can be overwritten in the task body. Default: "&&".
 ---@field max_depth integer? Maximum recursion depth for nested tasks to prevent infinity loops. Use -1 to disable the limit (caution). Default: 20.
 ---@field task_terminal_opts vim.api.keyset.win_config Configs to the floating terminal.
+---@field dashboard_config vim.api.keyset.win_config Configs to tasks dashboard.
+---
+--- Methods
+---
 ---@field setup fun(opts: JustConfig?): nil Default plugin setup function

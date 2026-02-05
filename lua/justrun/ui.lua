@@ -25,7 +25,7 @@ M.setup_highlights()
 ---@return nil
 M.set_task_terminal_keymaps = function(task_name)
   ---@type vim.keymap.set.Opts
-  local opts = { noremap = true, silent = true, buffer = state.get_task_buffer(task_name) }
+  local opts = { noremap = true, silent = true, buffer = state.get_task_buf(task_name) }
 
   -- quit (q)
   vim.keymap.set("n", "q", function()
@@ -62,7 +62,7 @@ M.create_task_window = function(task_name, enter, force)
   end
 
   ---@type integer?, string?
-  local buf, error = state.get_task_buffer(task_name, force)
+  local buf, error = state.get_task_buf(task_name, force)
 
   if error then
     return nil, error
@@ -216,7 +216,7 @@ M.close_task_terminal = function(task_name)
 
   local task_state = state.get_task_state(task_name) --[[@as JustTaskState]]
   ---@type integer?
-  local task_window = state.get_task_window(task_name)
+  local task_window = state.get_task_win(task_name)
 
   if not task_window or not vim.api.nvim_win_is_valid(task_window) then
     vim.notify("The task '" .. task_name .. "' was not open.", vim.log.levels.ERROR)
