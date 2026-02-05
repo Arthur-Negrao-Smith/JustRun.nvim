@@ -24,6 +24,9 @@ local M = {
   ---@type integer?
   dashboard_win = nil,
 
+  ---@type userdata
+  dashboard_timer = nil,
+
   --- Last task name runned
   ---@type string?
   last_task = nil,
@@ -276,6 +279,19 @@ end
 ---@return nil
 M.set_dashboard_win = function(win)
   M.dashboard_win = win
+end
+
+--- Get the dashboard timer
+---@return userdata?
+M.get_dashboard_timer = function()
+  return M.dashboard_timer
+end
+
+--- Set the dashboard timer
+---@param timer userdata
+---@return nil
+M.set_dashboard_timer = function(timer)
+  M.dashboard_timer = timer
 end
 
 ---@cast M JustState

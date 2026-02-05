@@ -96,11 +96,11 @@ M.create_task_window = function(task_name, enter, force)
 
   ---@type integer
   local available_width = total_width - dash_width
-  width = math.min(available_width - 4, config.task_terminal_opts.max_width)
+  width = math.min(available_width - 4, config.terminal_opts.max_width)
 
-  height = math.min(height, config.task_terminal_opts.max_height)
+  height = math.min(height, config.terminal_opts.max_height)
 
-  local win_opts = vim.tbl_extend("force", config.task_terminal_opts, {
+  local win_opts = vim.tbl_extend("force", config.get_cleaned_terminal_opts(), {
     width = width,
     height = height,
     row = row,
@@ -386,6 +386,47 @@ M.cleanup_dashboard_buf = function()
   end
 end
 
+M.stop_timer = function()
+  ---@type userdata?
+  local timer = state.get_dashboard_timer()
+
+  if timer then
+    if not timer:is_closing() then
+      timer:stop()
+      timer:close()
+    end
+
+    state.set_dashboard_timer(nil)
+  end
+end
+
+M.start_timer = function()
+  M.stop_timer()
+
+  local interval = config.dashboard_opts.refresh_interval --[[@as integer]]
+
+  local timer = vim.uv.new_timer() --[[@as userdata]]
+
+  state.set_dashboard_timer(timer)
+
+  timer:start(
+    interval,
+    interval,
+    vim.schedule_wrap(function()
+      ---@type integer?
+      local win = state.get_dashboard_win()
+
+      if not win or not vim.api.nvim_win_is_valid(win) then
+        M.stop_timer()
+        return
+      end
+
+      -- update dashboard
+      M.render_dashboard()
+    end)
+  )
+end
+
 ---@private Updates the Tasks Dashboard buffer data
 ---@return string? error
 M.render_dashboard = function()
@@ -399,20 +440,24 @@ M.render_dashboard = function()
     return error
   end
 
-  M.set_dashboard_modifiable(true)
-  M.cleanup_dashboard_buf()
-
   --- Dynamic size
   ---@type integer?
   local win_width = nil
+  ---@type integer[]?
+  local saved_cursor = nil
 
   ---@type integer?
   local dash_win = state.get_dashboard_win()
   if dash_win and vim.api.nvim_win_is_valid(dash_win) then
     win_width = vim.api.nvim_win_get_width(dash_win)
+    saved_cursor = vim.api.nvim_win_get_cursor(dash_win)
   end
 
-  local max_width = win_width or config.dashboard_config.width --[[@as integer]]
+  local max_width = win_width or config.dashboard_opts.width --[[@as integer]]
+
+  -- prepare the dashboard
+  M.set_dashboard_modifiable(true)
+  M.cleanup_dashboard_buf()
 
   ---@type table<string>
   local lines = {}
@@ -511,18 +556,32 @@ M.render_dashboard = function()
   end
 
   M.set_dashboard_modifiable(false)
+
+  if saved_cursor and dash_win and vim.api.nvim_win_is_valid(dash_win) then
+    local row = saved_cursor[1]
+    local column = saved_cursor[2]
+
+    if row > lines_idx then
+      row = lines_idx
+    end
+
+    pcall(vim.api.nvim_win_set_cursor, dash_win, { row, column })
+  end
 end
 
 M.toggle_dashboard = function()
   ---@type integer?
   local win = state.get_dashboard_win()
   if win and vim.api.nvim_win_is_valid(win) then
+    M.stop_timer()
     vim.api.nvim_win_close(win, true)
     state.set_dashboard_win(nil)
     return
   end
 
   M.render_dashboard()
+
+  M.start_timer()
 
   local buf = state.get_dashboard_buf() --[[@as integer]]
 
@@ -532,17 +591,15 @@ M.toggle_dashboard = function()
   local new_win = vim.api.nvim_get_current_win()
   state.set_dashboard_win(new_win)
 
-  local width = config.dashboard_config.width --[[@as integer]]
+  local width = config.dashboard_opts.width --[[@as integer]]
 
   vim.api.nvim_win_set_buf(new_win, buf)
   vim.api.nvim_win_set_width(new_win, width)
   -- set the header
   vim.api.nvim_set_option_value("winbar", "%=%#JustRunHeader# JustRun Dashboard %*%=", { win = new_win })
 
-  for opt, val in pairs(config.dashboard_config) do
-    if opt ~= "width" then
-      vim.api.nvim_set_option_value(opt, val, { win = new_win })
-    end
+  for opt, val in pairs(config.get_cleaned_dashboard_opts()) do
+    vim.api.nvim_set_option_value(opt, val, { win = new_win })
   end
 end
 
