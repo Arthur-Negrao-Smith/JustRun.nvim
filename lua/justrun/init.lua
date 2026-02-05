@@ -20,6 +20,9 @@ M.run_under_cursor = runner.run_under_cursor
 -- UI
 M.toggle_dashboard = ui.toggle_dashboard
 M.find = ui.find
+M.open_task_terminal = ui.open_task_terminal
+M.close_task_terminal = ui.close_task_terminal
+M.toggle_task_terminal = ui.toggle_task_terminal
 
 -- Helper
 ---@param tasks JustTasksTable

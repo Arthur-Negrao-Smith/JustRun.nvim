@@ -40,8 +40,13 @@ end
 ---@private Create a window to the task
 ---@param task_name string Target task name
 ---@param enter boolean Automatically enter in terminal if is true.
+---@param force boolean? Create a buffer if not exists. Will force if nil.
 ---@return integer?, string? (buffer, error) Returns a buffer id and error message
-M.create_task_window = function(task_name, enter)
+M.create_task_window = function(task_name, enter, force)
+  if force == nil then
+    force = true
+  end
+
   ---@type JustTaskState?
   local task_state = state.get_task_state(task_name)
 
@@ -57,7 +62,7 @@ M.create_task_window = function(task_name, enter)
   end
 
   ---@type integer?, string?
-  local buf, error = state.get_task_buffer(task_name, true)
+  local buf, error = state.get_task_buffer(task_name, force)
 
   if error then
     return nil, error
@@ -186,9 +191,14 @@ end
 --- Open a runned/running task terminal
 ---@param task_name string Target task to open your terminal.
 ---@param enter boolean? Enter automatically in terminal, if true or nil
-M.open_task_terminal = function(task_name, enter)
+---@param force boolean? Create a buffer if not exists. Will force if nil.
+M.open_task_terminal = function(task_name, enter, force)
+  if enter == nil then
+    enter = true
+  end
+
   ---@type _, string?
-  local _, error = M.create_task_window(task_name, enter or true)
+  local _, error = M.create_task_window(task_name, enter, force)
 
   if error then
     vim.notify(error, vim.log.levels.ERROR)
@@ -200,29 +210,34 @@ end
 ---@param task_name string Target task to close your terminal.
 M.close_task_terminal = function(task_name)
   if not state.is_loaded(task_name) then
-    vim.notify("The task '" .. task_name .. "' was not runned yet.")
+    vim.notify("The task '" .. task_name .. "' was not runned yet.", vim.log.levels.ERROR)
     return
   end
 
+  local task_state = state.get_task_state(task_name) --[[@as JustTaskState]]
   ---@type integer?
   local task_window = state.get_task_window(task_name)
 
   if not task_window or not vim.api.nvim_win_is_valid(task_window) then
-    vim.notify("The task '" .. task_name .. "' was not open.")
+    vim.notify("The task '" .. task_name .. "' was not open.", vim.log.levels.ERROR)
     return
   end
+
+  vim.api.nvim_win_close(task_window, true)
+  task_state.task_win = nil
 end
 
 --- Close a runned/running task terminal
 ---@param task_name string Target task to close your terminal.
----@param enter boolean? Enter automatically in terminal, if true or nil
-M.toggle_task_terminal = function(task_name, enter)
+---@param enter boolean? Enter automatically in terminal, if true or nil.
+---@param force boolean? Create a buffer to task if not exists. Will force if nil.
+M.toggle_task_terminal = function(task_name, enter, force)
   local task_state = state.get_task_state(task_name)
 
   if task_state and task_state.task_win and vim.api.nvim_win_is_valid(task_state.task_win) then
     M.close_task_terminal(task_name)
   else
-    M.open_task_terminal(task_name, enter)
+    M.open_task_terminal(task_name, enter, force)
   end
 end
 
@@ -274,15 +289,28 @@ M.set_dashboard_keymaps = function()
   ---@type vim.keymap.set.Opts
   local opts = { noremap = true, silent = true, buffer = state.get_dashboard_buf() }
 
-  -- quit (q)
+  -- quit (q) & (Esc + Esc)
   vim.keymap.set("n", "q", M.toggle_dashboard, opts)
 
   vim.keymap.set("n", "<Esc><Esc>", M.toggle_dashboard, opts)
 
-  -- refresh (r)
-  vim.keymap.set("n", "r", function()
+  -- update (u)
+  vim.keymap.set("n", "u", function()
     M.render_dashboard()
-    vim.notify("Tasks Dashboard was refreshed.", vim.log.levels.INFO)
+    vim.notify("Tasks Dashboard was updated.", vim.log.levels.INFO)
+  end, opts)
+
+  -- re-run
+  vim.keymap.set("n", "r", function()
+    local task_name, error = M.get_task_name_under_cursor()
+
+    if error then
+      vim.notify(error, vim.log.levels.ERROR)
+      return
+    end
+
+    runner.run(task_name)
+    M.render_dashboard()
   end, opts)
 
   -- enter/hide task terminal (<CR>)
@@ -294,7 +322,7 @@ M.set_dashboard_keymaps = function()
       return
     end
 
-    M.toggle_task_terminal(task_name, true)
+    M.toggle_task_terminal(task_name, true, false)
   end, opts)
 
   -- show/hide task terminal (s)
@@ -306,7 +334,7 @@ M.set_dashboard_keymaps = function()
       return
     end
 
-    M.toggle_task_terminal(task_name, false)
+    M.toggle_task_terminal(task_name, false, false)
   end, opts)
 
   -- delete (d)
