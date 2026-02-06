@@ -101,7 +101,7 @@ M = {
 ---@param opts JustConfig? All custom table configs
 ---@return nil
 M.setup = function(opts)
-  M = vim.tbl_deep_extend("force", M.config, opts or {})
+  M = vim.tbl_deep_extend("force", M, opts or {})
 end
 
 --- Get dashboard opts without "refresh_interval" and "width" fields.
