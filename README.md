@@ -21,7 +21,7 @@ Install using your favorite package manager. For [lazy.nvim](https://github.com/
 ```lua
 {
     "Arthur-Negrao-Smith/JustRun.nvim",
-    tag = "v2.0.1", -- Recommended to lock to the stable version
+    tag = "v2.0.2", -- Recommended to lock to the stable version
     dependencies = {
         "nvim-treesitter/nvim-treesitter", -- Required for :JustRunUnderCursor
     },

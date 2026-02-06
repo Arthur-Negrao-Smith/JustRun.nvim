@@ -4,7 +4,7 @@
 JustRun.nvim                                                     *justrun.nvim*
 
 A simple, flexible, and powerful task runner for Neovim 0.8+.
-Version: 2.0.1
+Version: 2.0.2
 
 FEATURES:
 - Project-local configuration (.justrun.lua)
