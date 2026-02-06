@@ -4,7 +4,7 @@
 JustRun.nvim                                                     *justrun.nvim*
 
 A simple, flexible, and powerful task runner for Neovim 0.8+.
-Version: 2.0.0
+Version: 2.0.1
 
 FEATURES:
 - Project-local configuration (.justrun.lua)
@@ -117,7 +117,7 @@ Complex example with type hinting: >lua
                                                              *justrun-commands*
 2. Commands ~
 
-:JustRun [task_name]                                                 *:JustRun*
+:JustRun {task_name}                                                 *:JustRun*
     Runs the specified task. If no argument is provided, runs the default task
     configured in setup (default: "default").
 
@@ -126,12 +126,25 @@ Complex example with type hinting: >lua
     in the configuration file and filetypes task if `show_filetype_tasks` are 
     enabled.
 
-:JustRunLast                                                   *:JustRunLast*
+:JustRunLast                                                     *:JustRunLast*
     Re-runs the last successfully executed task. Useful for TDD loops.
 
-:JustRunUnderCursor                                     *:JustRunUnderCursor*
+:JustRunUnderCursor                                       *:JustRunUnderCursor*
     Runs the task definition under the cursor. Must be triggered while editing
     the `.justrun.lua` file. Requires nvim-treesitter.
+
+:JustRunToggle                                                 *:JustRunToggle*
+    Toggles the visibility of the Tasks Dashboard.
+
+:JustRunOpenTerminal {task_name}                         *:JustRunOpenTerminal*
+    Opens the floating terminal window for the specified task.
+    If the task is not running or loaded, it might error.
+
+:JustRunCloseTerminal {task_name}                       *:JustRunCloseTerminal*
+    Closes the floating terminal window for the specified task.
+
+:JustRunToggleTerminal {task_name}                     *:JustRunToggleTerminal*
+    Toggles (Opens if closed, Closes if open) the floating terminal window
 
 
 

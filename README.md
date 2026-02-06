@@ -21,7 +21,7 @@ Install using your favorite package manager. For [lazy.nvim](https://github.com/
 ```lua
 {
     "Arthur-Negrao-Smith/JustRun.nvim",
-    tag = "v2.0.0", -- Recommended to lock to the stable version
+    tag = "v2.0.1", -- Recommended to lock to the stable version
     dependencies = {
         "nvim-treesitter/nvim-treesitter", -- Required for :JustRunUnderCursor
     },
@@ -302,6 +302,10 @@ Whenever the command `:JustRunFile` is called, the filetype will be inferred by 
 | `:JustRunLast` | None | Re-runs the last executed task. Great for TDD. |
 | `:JustRunUnderCursor` | None | Runs the task defined under the cursor in `.justrun.lua`. |
 | `:JustRunFile` | `[file_name]` | Runs the file using a filetype task. If empty, tries run the current file. |
+| `:JustRunToggle` | None | Toggles the Dashboard visibility. |
+| `:JustRunOpenTerminal` | `[task_name]` | Opens the floating terminal window for a specific task. |
+| `:JustRunCloseTerminal` | `[task_name]` | Closes the floating terminal window for a specific task. |
+| `:JustRunToggleTerminal` | `[task_name]` | Toggles (Open/Close) the floating terminal window for a specific task. |
 
 ## 🤝 Contributing
 
