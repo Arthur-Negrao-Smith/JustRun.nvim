@@ -3,8 +3,15 @@
 ===============================================================================
 JustRun.nvim                                                     *justrun.nvim*
 
-A simple, flexible, and powerful task runner for Neovim. Define your project
-tasks in a local Lua file and run them easily inside a terminal buffer.
+A simple, flexible, and powerful task runner for Neovim 0.8+.
+Version: 2.0.0
+
+FEATURES:
+- Project-local configuration (.justrun.lua)
+- Interactive Dashboard with auto-refresh
+- Smart task filtering and prioritization
+- Filetype inference
+- LSP support
 
 
 ===============================================================================
@@ -132,20 +139,72 @@ Complex example with type hinting: >lua
                                                                *justrun-config*
 3. Configuration ~
 
-You can configure the plugin via the setup function:
+You can configure the plugin via the setup function.
+Note: v2.0.0 introduces `dashboard_opts` and `terminal_opts`.
 >lua
     require("justrun").setup({
-        filename = ".justrun.lua",   -- File to load tasks from
-        filetype = {},               -- Table with tasks to run filetypes
-        show_filetype_tasks = false, -- Show the filetype tasks on find menu
-        default_task = "default",    -- Default task name
-        cwd = ".",                   -- Default working directory
-        force_run = false,           -- Run first task if default missing
-        split_direction = "vertical",-- "vertical" or "horizontal"
-        split_size = 50,             -- Size of the split
-        exit_on_success = false,     -- Close terminal on success (code 0)
-        default_sep = "&&",          -- Separator for command chaining
-        max_depth = 20,              -- Max recursion depth for nested tasks
+        -- Default file to load tasks from
+        filename = ".justrun.lua",
+
+        -- Default tasks for filetypes (overridable)
+        filetype = {
+            lua = { cmd = "lua ${file}",
+                desc = "Run the current lua file" },
+
+            python = { cmd = "python ${file}",
+                desc = "Run the current python file" },
+
+            javascript = { cmd = "node ${file}",
+                desc = "Run the current javascript file" },
+
+            c = { cmd = "gcc ${file} -o {fileWithouExtension}",
+                desc = "Run the current C file" },
+
+            cpp = { cmd = "g++ ${file} -o {fileWithouExtension}",
+                desc = "Run the current C++ file" },
+
+            -- *Others default filetype tasks* --
+        },
+
+        -- Behavior of the Find Menu (:JustRunFind)
+        -- false: Shows project tasks + ONLY the current filetype task.
+        -- true: Shows project tasks + ALL global filetype tasks.
+        show_filetype_tasks = false,
+
+        -- Default task if :JustRun is called without args
+        default_task = "default",
+
+        -- Global working directory
+        cwd = ".",
+
+        -- If true, runs the first available task if default_task is missing
+        force_run = false,
+
+        -- Close terminal if task exits with code 0
+        exit_on_success = false,
+
+        -- Separator for command chaining (e.g., "&&" or ";")
+        default_sep = "&&",
+
+        -- Floating Window Options for the Task Terminal
+        terminal_opts = {
+            relative = "editor",
+            style = "minimal",
+            border = "rounded",
+            -- Dynamic sizing (defaults to 80% of screen)
+            max_width = math.floor(vim.o.columns * 0.8),
+            max_height = math.floor(vim.o.lines * 0.8),
+        },
+
+        -- Dashboard Configuration
+        dashboard_opts = {
+            width = 40,              -- Width of the dashboard split
+            refresh_interval = 1000, -- Auto-refresh interval in ms
+            -- Window options for the dashboard buffer
+            cursorline = true,
+            number = false,
+            wrap = false,
+        },
     })
 <
 
@@ -248,6 +307,32 @@ argument). See the |ftplugin-docs| to see all filetypes supported by neovim.
             desc = "Run the current lua file"
         }
 <
+
+================================================================================
+                                                            *justrun-dashboard*
+7. Dashboard ~
+
+The dashboard provides a real-time view of your running and finished tasks.
+It updates automatically based on `refresh_interval`.
+
+MAPPINGS:
+    These mappings apply only within the JustRun Dashboard buffer:
+
+    <CR>    Toggle/Focus the terminal window for the task under cursor.
+    s       Toggle the terminal window (without focusing) for the task.
+    r       Re-run the task under cursor immediately.
+    d       Unload (delete) the task from memory. Stops execution if running.
+    u       Manually update/refresh the dashboard view.
+    q       Close the dashboard. Esc + Esc works
+
+VISUALS:
+    The dashboard uses the following Highlight Groups (link defaults shown):
+    - JustRunHeader    -> Title
+    - JustRunSuccess   -> String
+    - JustRunFail      -> ErrorMsg
+    - JustRunRunning   -> Function
+    - JustRunSeparator -> Comment
+
 
 ===============================================================================
 vim:tw=78:ts=8:ft=help:norl:

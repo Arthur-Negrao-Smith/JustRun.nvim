@@ -4,18 +4,16 @@ A simple, flexible, and powerful task runner for Neovim, written entirely in Lua
 
 ## ✨ Features
 
-* **Pure Lua**: Written entirely in Lua, ensuring fast startup times and seamless Neovim integration.
-* **Project-local configuration**: Define tasks in a `.justrun.lua` file in your project root.
-* **Flexible Task Definitions**: Tasks can be simple strings, lists of commands, or complex objects.
-* **Task Dependencies**: Use `run_before` to chain tasks (e.g., run `build` before `test`).
-* **Smart Auto-closing**: Configure tasks to close the terminal automatically on success.
-* **Placeholders**: Use variables like `${file}` to create flexible, context-aware tasks.
-* **Run Files By Type**: Create custom tasks for each filetype and run. See neovim [filetypes](https://neovim.io/doc/user/filetype.html).
-* **Run Under Cursor**: Execute a specific task just by placing your cursor over its name in the config file.
-* **UI Menu**: Select tasks from a nice UI list (`vim.ui.select`).
-* **Recursion Protection**: Built-in protection against infinite loops in nested tasks.
-* **Type Hinting**: Full LSP support for your configuration file.
-
+* **Pure Lua**: Written entirely in Lua for fast startup.
+* **Project-local configuration**: Define tasks in `.justrun.lua`.
+* **Interactive Dashboard**: Real-time status updates, logs preview, and task management.
+* **Smart Task Menu**: Automatically prioritizes the default task and the current filetype task in the search menu.
+* **Filetype Awareness**: Auto-detects and runs tasks based on the current filetype.
+* **Flexible Definitions**: Supports strings, lists, complex objects, and dynamic functions.
+* **Dependencies**: Chain tasks using `run_before`.
+* **Placeholders**: VSCode-style variables (`${file}`, `${workspaceFolder}`) and Vim modifiers.
+* **Recursion Protection**: Prevents infinite loops in nested tasks.
+* **Type Hinting**: Full LSP support with provided classes.
 ## ⚡ Installation
 
 Install using your favorite package manager. For [lazy.nvim](https://github.com/folke/lazy.nvim):
@@ -53,34 +51,28 @@ require("justrun").setup({
     -- Default file to load tasks from
     filename = ".justrun.lua",
 
-    -- Default tasks for each filetype
-    -- Use the filetype name to create each task
-    -- see default filetype names page of the neovim:
-    --  https://neovim.io/doc/user/filetype.html#_3.-docs-for-the-default-filetype-plugins.
+    -- Default tasks for filetypes (overridable)
     filetype = {
         lua = { cmd = "lua ${file}", desc = "Run current lua file" },
         python = { cmd = "python ${file}", desc = "Run current python file" },
         javascript = { cmd = "node ${file}", desc = "Run current javascript file" },
-        --- many others...
+
+        -- *Others default filetypes tasks* --
     },
 
-    -- Show all filetype tasks on the task find menu
+    -- Behavior of the Find Menu (:JustRunFind)
+    -- false: Shows project tasks + ONLY the current filetype task.
+    -- true: Shows project tasks + ALL global filetype tasks.
     show_filetype_tasks = false,
 
-    -- Default task to run if :JustRun is called without args
+    -- Default task if :JustRun is called without args
     default_task = "default",
 
-    -- Current working directory (can be overwritten per task)
+    -- Global working directory
     cwd = ".",
 
-    -- If true, runs the default_taks. Runs first available task if default_task is missing
+    -- If true, runs the first available task if default_task is missing
     force_run = false,
-
-    -- Terminal orientation: "vertical" | "horizontal"
-    split_direction = "vertical",
-
-    -- Terminal split size
-    split_size = 50,
 
     -- Close terminal if task exits with code 0
     exit_on_success = false,
@@ -88,9 +80,25 @@ require("justrun").setup({
     -- Separator for command chaining (e.g., "&&" or ";")
     default_sep = "&&",
 
-    -- Maximum recursion depth for nested tasks to prevent infinite loops.
-    -- Set to -1 to disable the limit (use with caution).
-    max_depth = 20,
+    -- Floating Window Options for the Task Terminal
+    terminal_opts = {
+        relative = "editor",
+        style = "minimal",
+        border = "rounded",
+        -- Dynamic sizing (defaults to 80% of screen)
+        max_width = math.floor(vim.o.columns * 0.8),
+        max_height = math.floor(vim.o.lines * 0.8),
+    },
+
+    -- Dashboard Configuration
+    dashboard_opts = {
+        width = 40,              -- Width of the dashboard split
+        refresh_interval = 1000, -- Auto-refresh interval in ms
+        -- Window options for the dashboard buffer
+        cursorline = true,
+        number = false,
+        wrap = false,
+    },
 })
 ```
 
@@ -200,6 +208,25 @@ return justrun.create_tasks({
 })
 ```
 
+## 📊 Interactive Dashboard
+
+JustRun v2.0 introduces a real-time Dashboard to monitor your tasks. It opens automatically (or via toggle) and updates the status of running tasks.
+
+**Keymaps inside the Dashboard:**
+
+| Key | Action |
+| :--- | :--- |
+| `<CR>` | **Enter/Focus or Hide**: Opens the task terminal and focuses it. |
+| `s` | **Show or Hide**: Opens the task terminal without focusing (peek). |
+| `r` | **Re-run**: Re-runs the task under the cursor. |
+| `d` | **Delete**: Unloads/Stops the task and clears the buffer. |
+| `u` | **Update**: Manually refreshes the dashboard view. |
+| `q` | **Quit**: Closes the dashboard. |
+
+The dashboard displays:
+- **Status Icons**: `✔` (Success), `✖` (Fail), `●` (Running).
+- **Output Preview**: The last few lines of the terminal output.
+
 ### Task Options Reference
 
 | Field | Type | Description |
@@ -255,7 +282,7 @@ Additionally, you can also overwrite the default filetype task using the filetyp
 ```lua
 local justrun = require("justrun")
 
-justrun.create_tasks({
+return justrun.create_tasks({
     -- the task must have the same name of the filetype name task to overwrite the default filetype task
     python = {
         cmd = "echo 'Runing the python file' && python ${file}",

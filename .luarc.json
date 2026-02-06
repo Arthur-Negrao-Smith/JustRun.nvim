@@ -1,0 +1,15 @@
+{
+  "runtime.version": "LuaJIT",
+  "workspace": {
+    "library": [
+      "lua/",
+      "$VIMRUNTIME/lua"
+    ],
+    "ignoreDir":[
+      ".git"
+    ]
+  },
+  "dignostics.globals": [
+    "vim"
+  ]
+}
