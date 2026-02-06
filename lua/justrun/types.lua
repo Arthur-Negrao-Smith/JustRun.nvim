@@ -168,8 +168,8 @@
 ---@field exit_on_success boolean? Close the terminal if the task succeeds. This option can be overwritten in the task body. Default: false.
 ---@field default_sep string? Default separator to join tasks commands. This option can be overwritten in the task body. Default: "&&".
 ---@field max_depth integer? Maximum recursion depth for nested tasks to prevent infinity loops. Use -1 to disable the limit (caution). Default: 20.
----@field terminal_opts vim.api.keyset.win_config Task floating terminals options.
----@field dashboard_opts JustDashboardOpts Tasks dashboard options.
+---@field terminal_opts vim.api.keyset.win_config? Task floating terminals options.
+---@field dashboard_opts JustDashboardOpts? Tasks dashboard options.
 ---
 --- Methods
 ---
